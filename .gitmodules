@@ -1,0 +1,6 @@
+[submodule "Assets/tutinoco/BenriSwitch"]
+	path = Assets/tutinoco/BenriSwitch
+	url = https://github.com/tutinoco/BenriSwitch.git
+[submodule "Assets/tutinoco/JoinAlert"]
+	path = Assets/tutinoco/JoinAlert
+	url = https://github.com/tutinoco/JoinAlert.git
