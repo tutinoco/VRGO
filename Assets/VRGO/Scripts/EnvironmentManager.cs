@@ -3,6 +3,7 @@ using UnityEngine;
 using VRC.SDKBase;
 using VRC.Udon;
 
+[UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
 public class EnvironmentManager : UdonSharpBehaviour
 {
     [Header("管理するGoManagerを設定します")]
@@ -11,21 +12,51 @@ public class EnvironmentManager : UdonSharpBehaviour
     [SerializeField] private GameObject[] playAreas;
     [SerializeField] private GameObject[] cameras;
 
-    private int goValue;
+    [UdonSynced(UdonSyncMode.None), FieldChangeCallback(nameof(goValue))] private int _goValue;
+    public int goValue {
+        set {
+            _goValue = value;
+            int h = gosyss.Length / 2;
+            for (int i=0; i<gosyss.Length; i++) {
+                bool b = i >= h-_goValue && i <= h+_goValue;
+                gosyss[i].gameObject.SetActive(b);
+                screens[i].gameObject.SetActive(b);
+            }
+        }
+        get { return _goValue; }
+    }
 
-    public void AddGo() { SetGosysNumber(goValue+1); }
-    public void SubGo() { SetGosysNumber(goValue-1); }
+    public void AddGo()
+    {
+        if ( !Networking.IsOwner(gameObject) ) return;
+        goValue = Mathf.Max(Mathf.Min(goValue+1, gosyss.Length/2),0);
+        RequestSerialization();
+    }
+
+    public void SubGo()
+    {
+        if ( !Networking.IsOwner(gameObject) ) return;
+        goValue = Mathf.Max(Mathf.Min(goValue-1, gosyss.Length/2),0);
+        RequestSerialization();
+    }
     
     void Start()
     {
-        SetGosysNumber(1);
+        if ( !Networking.IsOwner(gameObject) ) return;
+        goValue = 2;
+        RequestSerialization();
+    }
+
+    public override void OnPlayerJoined(VRCPlayerApi player)
+    {
+        
     }
 
     public void SimulOn()
     {
         for (int i=0; i<gosyss.Length; i++) {
             int h = gosyss.Length / 2;
-            float w = 2.8f;
+            float w = 2.2f;
             gosyss[i].gameObject.transform.position = new Vector3(-h*w+i*w, 0, 0);
             playAreas[i].gameObject.transform.rotation = Quaternion.Euler(0,90,0);
             cameras[i].gameObject.transform.rotation = Quaternion.Euler(90,180,0);
@@ -43,19 +74,5 @@ public class EnvironmentManager : UdonSharpBehaviour
             cameras[i].gameObject.transform.rotation = Quaternion.Euler(90,90,0);
             screens[i].gameObject.transform.position = new Vector3(-h*w+i*w, 0, 0);
         }
-    }
-
-    public void SetGosysNumber(int n) {
-        int h = gosyss.Length / 2;
-        n = Mathf.Min(n, h);
-        if ( goValue == n ) return;
-        int num = n * 2 + 1;
-
-        for (int i=0; i<gosyss.Length; i++) {
-            bool b = i >= h-n && i <= h+n;
-            gosyss[i].gameObject.SetActive(b);
-            screens[i].gameObject.SetActive(b);
-        }
-        goValue = n;
     }
 }
