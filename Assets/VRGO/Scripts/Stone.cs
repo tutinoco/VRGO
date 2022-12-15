@@ -29,6 +29,9 @@ public class Stone : UdonSharpBehaviour
     [Header("VRCObjectSyncを設定します")]
     [SerializeField] private VRCObjectSync objectsync;
 
+    [Header("VRCPickupを設定します")]
+    [SerializeField] private VRCPickup pickup;
+
 //    [Header("碁石を持ちやすくするためのコライダーを設定します")]
 //    [SerializeField] private Collider pickupCollider;
 
@@ -87,6 +90,7 @@ public class Stone : UdonSharpBehaviour
     void OnDrop()
     {
         state = StoneState.Droped;
+//        pickup.pickupable = false;
     }
 
     void OnPickup()
@@ -102,20 +106,42 @@ public class Stone : UdonSharpBehaviour
 
         // 碁盤に石が当たった音を再生します。
         if ( col.gameObject.layer==23 ) {
+            pickup.pickupable = true;
             if ( state==StoneState.Droped ) {
                 SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PlayStrikeSound));
                 state = StoneState.Hited;
             }
         }
 
-        if ( col.gameObject.layer==24 ) {
+        if ( col.gameObject.layer==24 && state != StoneState.Pickup) {
             MarkerOff();
+            pickup.pickupable = false;
             if( state==StoneState.Droped ) {
                 gosys.Return(this);
                 SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PlayReturnSound));
             }
             state = StoneState.Spawned;
         }
+    }
+
+    public void onHandAreaEnter( Vector3 handPos )
+    {
+        pickup.pickupable = true;
+    }
+
+    public void onHandAreaExit()
+    {
+        pickup.pickupable = false;
+    }
+
+    public void OnSpawnLayHit( Vector3 origin )
+    {
+        if ( state != StoneState.Spawned ) return;
+        gameObject.transform.position = new Vector3(origin.x, origin.y-0.48f, origin.z);
+        gameObject.transform.rotation = Quaternion.Euler(-90, UnityEngine.Random.Range(0f,360f), 0);
+        Vector3 v = rigidbody.velocity;
+        rigidbody.velocity = new Vector3(v.x, 0, v.z);
+        pickup.pickupable = true;
     }
 
     public void PlayTakeSound(){ if(audioSource && sndTake) audioSource.PlayOneShot(sndTake); }
