@@ -28,6 +28,12 @@ public class GoSystem : UdonSharpBehaviour
     [SerializeField] private Text blackUserText;
     [SerializeField] private Text whiteUserText;
 
+    [Header("碁石を一時的に隠しておく場所HiddenBoxを設定します")]
+    [SerializeField] private GameObject hiddenBox;
+
+    [Header("プレイエリアを設定します")]
+    [SerializeField] public GameObject playArea;
+
     [UdonSynced(UdonSyncMode.None), FieldChangeCallback(nameof(log))] private string _log = "";
     [UdonSynced(UdonSyncMode.None)] private int pcnt;
     private Stone[] logSt = new Stone[0];
@@ -165,19 +171,11 @@ public class GoSystem : UdonSharpBehaviour
     {
         RaycastHit hit;
         Vector3 p = blackPool.gameObject.transform.position;
-        p = new Vector3(p.x, p.y+0.5f, p.z);
-        Ray ray = new Ray(p, new Vector3(0, -1, 0));
-        if ( Physics.Raycast(ray, out hit) && hit.collider!=null ) {
-            if( hit.collider.gameObject.layer==24 ) blackPool.TryToSpawn();
-            if( hit.collider.gameObject.layer==22 ) ((Stone)hit.collider.gameObject.transform.GetComponent(typeof(UdonBehaviour))).OnSpawnLayHit(p);
-        }            
+        Ray ray = new Ray(new Vector3(p.x, p.y+0.5f, p.z), new Vector3(0, -1, 0));
+        if ( Physics.Raycast(ray, out hit) && hit.collider!=null && hit.collider.gameObject.layer==24 ) blackPool.TryToSpawn();
         p = whitePool.gameObject.transform.position;
-        p = new Vector3(p.x, p.y+0.5f, p.z);
-        ray = new Ray(p, new Vector3(0, -1, 0));
-        if ( Physics.Raycast(ray, out hit) && hit.collider!=null ) {
-            if( hit.collider.gameObject.layer==24 ) whitePool.TryToSpawn();
-            if( hit.collider.gameObject.layer==22 ) ((Stone)hit.collider.gameObject.transform.GetComponent(typeof(UdonBehaviour))).OnSpawnLayHit(p);
-        }
+        ray = new Ray(new Vector3(p.x, p.y+0.5f, p.z), new Vector3(0, -1, 0));
+        if ( Physics.Raycast(ray, out hit) && hit.collider!=null && hit.collider.gameObject.layer==24 ) whitePool.TryToSpawn();
     }
 
     public void Return( Stone s )
@@ -198,11 +196,27 @@ public class GoSystem : UdonSharpBehaviour
         Networking.SetOwner(Networking.LocalPlayer, gameObject);
         Networking.SetOwner(Networking.LocalPlayer, blackPool.gameObject);
         Networking.SetOwner(Networking.LocalPlayer, whitePool.gameObject);
-        for (int i=0; i<blackPool.Pool.Length; i++) Networking.SetOwner(Networking.LocalPlayer, blackPool.Pool[i]);
-        for (int i=0; i<whitePool.Pool.Length; i++) Networking.SetOwner(Networking.LocalPlayer, whitePool.Pool[i]);
+        for (int i=0; i<blacks.Length; i++) Networking.SetOwner(Networking.LocalPlayer, blacks[i].gameObject);
+        for (int i=0; i<whites.Length; i++) Networking.SetOwner(Networking.LocalPlayer, whites[i].gameObject);
+        foreach (Stone s in whites) {
+            GameObject g = s.gameObject;
+            Networking.SetOwner(Networking.LocalPlayer, g);
+            if( g.activeSelf ) whitePool.Return( g );
+        }
+        foreach (Stone s in blacks) {
+            GameObject g = s.gameObject;
+            Networking.SetOwner(Networking.LocalPlayer, g);
+            if( g.activeSelf ) blackPool.Return( g );
+        }
 
-        // 全てのPCで全ての石を戻す
-        SendCustomNetworkEvent(NetworkEventTarget.All, nameof(Initialize));
+        log = "";
+        pcnt = 0;
+        blackUser = 0;
+        whiteUser = 0;
+        logSt = new Stone[0];
+        logPt = new Vector3[0];   
+
+        RequestSerialization();
     }
 
     private void UpdateMark()
@@ -216,19 +230,6 @@ public class GoSystem : UdonSharpBehaviour
     {
         foreach (Stone s in blacks) if( s.gameObject.activeSelf ) s.MarkerOff();
         foreach (Stone s in whites) if( s.gameObject.activeSelf ) s.MarkerOff();
-    }
-
-    public void Initialize()
-    {
-        log = "";
-        pcnt = 0;
-        blackUser = 0;
-        whiteUser = 0;
-        logSt = new Stone[0];
-        logPt = new Vector3[0];
-
-        foreach (Stone s in blacks) if( s.gameObject.activeSelf ) blackPool.Return( s.gameObject );
-        foreach (Stone s in whites) if( s.gameObject.activeSelf ) whitePool.Return( s.gameObject );
     }
 
     public Vector2Int GetZahyo( Vector3 pos )
@@ -286,13 +287,18 @@ public class GoSystem : UdonSharpBehaviour
     {
         Vector3[] bptAry = new Vector3[blacks.Length];
         Vector3[] wptAry = new Vector3[whites.Length];
+        bool[] bReturns = new bool[blacks.Length];
+        bool[] wReturns = new bool[whites.Length];
 
         if( isMark ) SendCustomNetworkEvent(NetworkEventTarget.All, "AllMarkerOff");
 
-        Vector3 blackSpawnPoint = GetSpawnPoint(true);
-        Vector3 whiteSpawnPoint = GetSpawnPoint(false);
-        for (int i=0; i<blacks.Length; i++) if ( blacks[i].gameObject.activeSelf ) bptAry[i] = blackSpawnPoint;
-        for (int i=0; i<whites.Length; i++) if ( whites[i].gameObject.activeSelf ) wptAry[i] = whiteSpawnPoint;
+        Vector3 hiddenPoint = hiddenBox.transform.localPosition;
+        for (int i=0; i<blacks.Length; i++) if ( blacks[i].gameObject.activeSelf ) { bptAry[i]=hiddenPoint; bReturns[i]=true; }
+        for (int i=0; i<whites.Length; i++) if ( whites[i].gameObject.activeSelf ) { wptAry[i]=hiddenPoint; wReturns[i]=true; }
+
+        for (int i=0; i<logSt.Length; i++) { Stone s=logSt[i]; if(s.isBlack) bReturns[s.idx]=false; else wReturns[s.idx]=false; }
+        for (int i=0; i<bReturns.Length; i++) if( bReturns[i] ) { blackPool.Return(blacks[i].gameObject); bptAry[i]=(new Vector3[1])[0]; }
+        for (int i=0; i<wReturns.Length; i++) if( wReturns[i] ) { whitePool.Return(whites[i].gameObject); wptAry[i]=(new Vector3[1])[0]; }
 
         for (int i=logSt.Length-1; i>step; i--) {
             Stone s = logSt[i];
@@ -321,6 +327,7 @@ public class GoSystem : UdonSharpBehaviour
             s.TeleportTo(p1);
         }
 
+        Networking.SetOwner(Networking.LocalPlayer, gameObject);
         pcnt = step;
         RequestSerialization();
     }

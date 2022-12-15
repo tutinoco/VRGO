@@ -32,9 +32,6 @@ public class Stone : UdonSharpBehaviour
     [Header("VRCPickupを設定します")]
     [SerializeField] private VRCPickup pickup;
 
-//    [Header("碁石を持ちやすくするためのコライダーを設定します")]
-//    [SerializeField] private Collider pickupCollider;
-
     [Header("マーカーを設定します")]
     [SerializeField] private GameObject marker;
 
@@ -49,21 +46,18 @@ public class Stone : UdonSharpBehaviour
     [System.NonSerialized] public int idx;
     [System.NonSerialized] public bool isBlack;
 
-//    [SerializeField] private Text info;
-
     private StoneState state = StoneState.Spawned;
 
     void Update()
     {
-//        info.text = state.ToString()+"\n"+Networking.GetOwner(gameObject).displayName.Substring(0,6);
-
-//        pickupCollider.enabled = state==StoneState.Spawned;
-
         if( Networking.IsOwner(gameObject) && state==StoneState.Hited && rigidbody.IsSleeping() ) {
             Debug.Log(state);
             if( gosys.isNormal ) {
-                TeleportTo(gosys.GetNormalPosition(gameObject.transform.localPosition));
-                SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PlayNormalSound));
+                Vector2Int zahyo = gosys.GetZahyo(gameObject.transform.localPosition);
+                if( Mathf.Abs(zahyo.x) <= 9 && Mathf.Abs(zahyo.y) <= 9 ) {
+                    TeleportTo(gosys.GetNormalPosition(gameObject.transform.localPosition));
+                    SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PlayNormalSound));
+                }
             }
             SendCustomNetworkEvent(NetworkEventTarget.All, nameof(OnSleepInOwner));
             state = StoneState.Sended;
@@ -90,7 +84,6 @@ public class Stone : UdonSharpBehaviour
     void OnDrop()
     {
         state = StoneState.Droped;
-//        pickup.pickupable = false;
     }
 
     void OnPickup()
@@ -106,7 +99,6 @@ public class Stone : UdonSharpBehaviour
 
         // 碁盤に石が当たった音を再生します。
         if ( col.gameObject.layer==23 ) {
-            pickup.pickupable = true;
             if ( state==StoneState.Droped ) {
                 SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PlayStrikeSound));
                 state = StoneState.Hited;
@@ -115,7 +107,6 @@ public class Stone : UdonSharpBehaviour
 
         if ( col.gameObject.layer==24 && state != StoneState.Pickup) {
             MarkerOff();
-            pickup.pickupable = false;
             if( state==StoneState.Droped ) {
                 gosys.Return(this);
                 SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PlayReturnSound));
@@ -132,16 +123,6 @@ public class Stone : UdonSharpBehaviour
     public void onHandAreaExit()
     {
         pickup.pickupable = false;
-    }
-
-    public void OnSpawnLayHit( Vector3 origin )
-    {
-        if ( state != StoneState.Spawned ) return;
-        gameObject.transform.position = new Vector3(origin.x, origin.y-0.48f, origin.z);
-        gameObject.transform.rotation = Quaternion.Euler(-90, UnityEngine.Random.Range(0f,360f), 0);
-        Vector3 v = rigidbody.velocity;
-        rigidbody.velocity = new Vector3(v.x, 0, v.z);
-        pickup.pickupable = true;
     }
 
     public void PlayTakeSound(){ if(audioSource && sndTake) audioSource.PlayOneShot(sndTake); }
