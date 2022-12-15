@@ -21,16 +21,20 @@ public class GoSystem : UdonSharpBehaviour
     [SerializeField] private float roHeight;
     [SerializeField] private int roNumber;    
 
-    [Header("SGFの出力先となるInputFieldを設定します")]    
+    [Header("SGFの出力先となるInputFieldを設定します")]
     [SerializeField] private InputField sgfField;
+
+    [Header("プレイヤー名を表示するTextを設定します")]
+    [SerializeField] private Text blackUserText;
+    [SerializeField] private Text whiteUserText;
 
     [UdonSynced(UdonSyncMode.None), FieldChangeCallback(nameof(log))] private string _log = "";
     [UdonSynced(UdonSyncMode.None)] private int pcnt;
     private Stone[] logSt = new Stone[0];
     private Vector3[] logPt = new Vector3[0];
 
-    [UdonSynced(UdonSyncMode.None)] private string blackUser = "";
-    [UdonSynced(UdonSyncMode.None)] private string whiteUser = "";
+    [UdonSynced(UdonSyncMode.None), FieldChangeCallback(nameof(blackUser))] private string _blackUser = "";
+    [UdonSynced(UdonSyncMode.None), FieldChangeCallback(nameof(whiteUser))] private string _whiteUser = "";
 
     [System.NonSerialized] public bool isNormal;
     [System.NonSerialized] public bool isMark;
@@ -40,6 +44,8 @@ public class GoSystem : UdonSharpBehaviour
 
     public void PrevLog() { if( pcnt < logSt.Length-1 ) ReadLog(pcnt+1); }
     public void NextLog() { if( pcnt >= 0 ) ReadLog(pcnt-1); }
+    public void FirstLog() { if( pcnt < logSt.Length-1 ) ReadLog(logSt.Length-1); }
+    public void LastLog() { if( pcnt > 0 ) ReadLog(-1); }
 
     public void Set19Ro() { roNumber = 19; }
     public void Set13Ro() { roNumber = 13; }
@@ -82,6 +88,16 @@ public class GoSystem : UdonSharpBehaviour
         get { return _log; }
     }
 
+    public string blackUser {
+        set { _blackUser = value; ShowUserName(true, value); }
+        get { return _blackUser; }
+    }
+
+    public string whiteUser {
+        set { _whiteUser = value; ShowUserName(false, value); }
+        get { return _whiteUser; }
+    }
+
     void Start()
     {
         blacks = new Stone[blackPool.Pool.Length];
@@ -120,14 +136,14 @@ public class GoSystem : UdonSharpBehaviour
 
     public void Return( Stone s )
     {
-        s.transform.localPosition = GetSpawnPoint(s.isBlack);
+        s.transform.position = GetSpawnPoint(s.isBlack);
         s.transform.rotation = Quaternion.Euler(-90, UnityEngine.Random.Range(0f,360f), 0);
     }
 
     private Vector3 GetSpawnPoint( bool isBlack )
     {
         Vector3 p = isBlack ? blackPool.gameObject.transform.position : whitePool.gameObject.transform.position;
-        return new Vector3(p.x+UnityEngine.Random.Range(-0.001f,0.001f), 0, p.z+UnityEngine.Random.Range(-0.001f,0.001f));
+        return new Vector3(p.x+UnityEngine.Random.Range(-0.001f,0.001f), p.y, p.z+UnityEngine.Random.Range(-0.001f,0.001f));
     }
 
     public void Reset()
@@ -180,11 +196,19 @@ public class GoSystem : UdonSharpBehaviour
         return new Vector3((float)zahyo.x*roWidth, pos.y, (float)zahyo.y*roHeight);
     }
 
+    private void ShowUserName( bool isBlack, string name )
+    {
+        Text t = isBlack ? blackUserText : whiteUserText;
+        String s = (isBlack?"黒":"白")+"\n<size=36>"+name+"</size>";
+        t.text = name=="" ? "" : s;
+    }
+
     public void WriteLog( Stone s )
     {
         // 初手のユーザ名を記録
-        if( s.isBlack && blackUser=="" ) blackUser = Networking.GetOwner(s.gameObject).displayName;
-        if( !s.isBlack && whiteUser=="" ) whiteUser = Networking.GetOwner(s.gameObject).displayName;
+        string name = Networking.GetOwner(s.gameObject).displayName;
+        if( s.isBlack && blackUser=="" ) blackUser = name;
+        if( !s.isBlack && whiteUser=="" ) whiteUser = name;
 
         if( logSt.Length > 0 ) {
 
