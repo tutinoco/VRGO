@@ -35,9 +35,6 @@ public class Stone : UdonSharpBehaviour
     [Header("マーカーを設定します")]
     [SerializeField] private GameObject marker;
 
-    [Header("碁石の種類を設定します")]
-    [SerializeField] public bool isBlack;
-
     [Header("効果音を設定します")]
     [SerializeField] private AudioSource audioSource;
     [SerializeField] private AudioClip sndPickup;
@@ -45,6 +42,9 @@ public class Stone : UdonSharpBehaviour
     [SerializeField] private AudioClip sndTake;
     [SerializeField] private AudioClip sndReturn;
     [SerializeField] private AudioClip sndNormal;
+
+    [System.NonSerialized] public int idx;
+    [System.NonSerialized] public bool isBlack;
 
 //    [SerializeField] private Text info;
 
@@ -111,7 +111,7 @@ public class Stone : UdonSharpBehaviour
         if ( col.gameObject.layer==24 ) {
             MarkerOff();
             if( state==StoneState.Droped ) {
-                gosys.Respawn(this);
+                gosys.Return(this);
                 SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PlayReturnSound));
             }
             state = StoneState.Spawned;
