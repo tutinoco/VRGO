@@ -54,9 +54,14 @@ public class EnvironmentManager : UdonSharpBehaviour
 
     public void SimulOn()
     {
+/*        foreach (GoSystem gs in gosyss) {
+            Debug.Log("status: "+gs.status);
+            if( gs.status != GoSystemStatus.Standby ) return;
+        }
+*/
         for (int i=0; i<gosyss.Length; i++) {
             int h = gosyss.Length / 2;
-            float w = 2.2f;
+            float w = 1.2f;
             gosyss[i].gameObject.transform.position = new Vector3(-h*w+i*w, 0, 0);
             playAreas[i].gameObject.transform.rotation = Quaternion.Euler(0,90,0);
             cameras[i].gameObject.transform.rotation = Quaternion.Euler(90,180,0);
@@ -65,10 +70,12 @@ public class EnvironmentManager : UdonSharpBehaviour
     }
 
     public void SimulOff() {
+//        foreach (GoSystem gs in gosyss) if( gs.status != GoSystemStatus.Standby ) return;
+
         for (int i=0; i<gosyss.Length; i++) {
             GoSystem gosys = gosyss[i];
             int h = gosyss.Length / 2;
-            float w = 5.5f;
+            float w = 5.0f;
             gosyss[i].gameObject.transform.position = new Vector3(-h*w+i*w, 0, 0);
             playAreas[i].gameObject.transform.rotation = Quaternion.Euler(0,0,0);
             cameras[i].gameObject.transform.rotation = Quaternion.Euler(90,90,0);

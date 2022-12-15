@@ -67,7 +67,7 @@ public class Stone : UdonSharpBehaviour
     public void OnSleepInOwner()
     {
         var gosysOwner = Networking.GetOwner(gosys.gameObject);
-        if( Networking.LocalPlayer == gosysOwner && !gosys.isKento ) SendCustomEventDelayedSeconds(nameof(Record), 2.0f);
+        if( Networking.LocalPlayer == gosysOwner && gosys.status!=GoSystemStatus.Kento ) SendCustomEventDelayedSeconds(nameof(Record), 2.0f);
     }
 
     public void TeleportTo( Vector3 p )

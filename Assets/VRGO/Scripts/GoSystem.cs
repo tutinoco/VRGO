@@ -7,6 +7,13 @@ using VRC.SDK3.Components;
 using VRC.Udon;
 using VRC.Udon.Common.Interfaces;
 
+public enum GoSystemStatus
+{
+    Standby,
+    Playing,
+    Kento,
+}
+
 [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
 public class GoSystem : UdonSharpBehaviour
 {
@@ -44,7 +51,7 @@ public class GoSystem : UdonSharpBehaviour
 
     [System.NonSerialized] public bool isNormal;
     [System.NonSerialized] public bool isMark;
-    [System.NonSerialized] public bool isKento;
+    [System.NonSerialized] public GoSystemStatus status = GoSystemStatus.Standby;
 
     private Stone tgtStone;
 
@@ -65,8 +72,8 @@ public class GoSystem : UdonSharpBehaviour
     public void MarkOn() { isMark = true; UpdateMark(); }
     public void MarkOff() { isMark = false; AllMarkerOff(); }
 
-    public void KentoOn() { if ( logSt.Length > 0 ) { isKento = true; ReadLog(pcnt=-1); sgfField.text=GetSgf(); } }
-    public void KentoOff() { isKento = false; ReadLog(pcnt=-1); }
+    public void KentoOn() { if ( logSt.Length > 0 ) { status=GoSystemStatus.Kento; ReadLog(pcnt=-1); sgfField.text=GetSgf(); } }
+    public void KentoOff() { status=GoSystemStatus.Playing; ReadLog(pcnt=-1); }
 
     public string log {
         set {
@@ -215,6 +222,7 @@ public class GoSystem : UdonSharpBehaviour
         whiteUser = 0;
         logSt = new Stone[0];
         logPt = new Vector3[0];   
+        status = GoSystemStatus.Standby;
 
         RequestSerialization();
     }
@@ -253,6 +261,8 @@ public class GoSystem : UdonSharpBehaviour
 
     public void WriteLog( Stone s )
     {
+        if( status == GoSystemStatus.Standby ) status = GoSystemStatus.Playing;
+
         // 初手のユーザ名を記録
         int playerId = Networking.GetOwner(s.gameObject).playerId;
         if( s.isBlack && blackUser==0 ) blackUser = playerId;
