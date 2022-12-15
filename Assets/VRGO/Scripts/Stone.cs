@@ -13,8 +13,8 @@ public enum StoneState
     Spawned,
     Pickup,
     Droped,
-    Stoped,
-    Killing,
+    Hited,
+    Sended,
 }
 
 [UdonBehaviourSyncMode(BehaviourSyncMode.Continuous)]
@@ -29,11 +29,14 @@ public class Stone : UdonSharpBehaviour
     [Header("VRCObjectSyncを設定します")]
     [SerializeField] private VRCObjectSync objectsync;
 
+//    [Header("碁石を持ちやすくするためのコライダーを設定します")]
+//    [SerializeField] private Collider pickupCollider;
+
+    [Header("マーカーを設定します")]
+    [SerializeField] private GameObject marker;
+
     [Header("碁石の種類を設定します")]
     [SerializeField] public bool isBlack;
-
-    [Header("碁石をとりやすくするためのコライダーを設定します")]
-    [SerializeField] private Collider pickupCollider;
 
     [Header("効果音を設定します")]
     [SerializeField] private AudioSource audioSource;
@@ -43,117 +46,84 @@ public class Stone : UdonSharpBehaviour
     [SerializeField] private AudioClip sndReturn;
     [SerializeField] private AudioClip sndNormal;
 
-    [SerializeField] private Text info;
+//    [SerializeField] private Text info;
 
-    [UdonSynced(UdonSyncMode.None)] private StoneState state = StoneState.Spawned;
-    private bool isLoged;
-
-    void Start()
-    {
-    }
+    private StoneState state = StoneState.Spawned;
 
     void Update()
     {
-        pickupCollider.enabled = state == StoneState.Spawned;
+//        info.text = state.ToString()+"\n"+Networking.GetOwner(gameObject).displayName.Substring(0,6);
 
-        info.text = state.ToString()+"\n"+Networking.GetOwner(gameObject).displayName.Substring(0,6);
+//        pickupCollider.enabled = state==StoneState.Spawned;
 
-        // GoSystemの管理者PCがKilling状態の石を見つけたら値をリセットして石をReturnする。
-        if( state==StoneState.Killing && Networking.LocalPlayer==Networking.GetOwner(gosys.gameObject) ) Return();
-
-        if ( Networking.IsOwner(gameObject) && state==StoneState.Droped && rigidbody.IsSleeping() ) {
-            state = StoneState.Stoped;
-            SendCustomEventDelayedSeconds(nameof(SetOwnerToGosysOwner), 2.0f); // すぐオーナーを戻すとstateの同期が遅延するので遅らせてます
-
-//            Networking.SetOwner(Networking.LocalPlayer, gameObject);
-//            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PlayNormalSound));
+        if( Networking.IsOwner(gameObject) && state==StoneState.Hited && rigidbody.IsSleeping() ) {
+            Debug.Log(state);
+            if( gosys.isNormal ) {
+                TeleportTo(gosys.GetNormalPosition(gameObject.transform.localPosition));
+                SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PlayNormalSound));
+            }
+            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(OnSleepInOwner));
+            state = StoneState.Sended;
         }
-
-        // GoSystemの権利者から見た世界で落下中の石の権利が他人にあったら自分のものにする
-//        if ( Networking.IsOwner(gosys.gameObject) && state==StoneState.Droped && !Networking.IsOwner(gameObject) ) {
-  //          Networking.SetOwner(Networking.LocalPlayer, gameObject);
-//        }
-        
-/*        if ( Networking.IsOwner(gameObject) !rigidbody.isKinematic && rigidbody.IsSleeping() ) {
-            rigidbody.constraints = RigidbodyConstraints.FreezeAll;
-            Networking.SetOwner(Networking.GetOwner(gosys.gameObject), gameObject);
-        }
-            var gosysOwner = Networking.GetOwner(gosys.gameObject);
-            if( Networking.LocalPlayer != gosysOwner ) Networking.SetOwner(gosysOwner, gameObject);
-        
-        */
     }
 
-    public void SetOwnerToGosysOwner()
+    public void OnSleepInOwner()
     {
         var gosysOwner = Networking.GetOwner(gosys.gameObject);
-        if( Networking.LocalPlayer != gosysOwner ) Networking.SetOwner(gosysOwner, gameObject);
+        if( Networking.LocalPlayer == gosysOwner && !gosys.isKento ) SendCustomEventDelayedSeconds(nameof(Record), 2.0f);
     }
 
-    public void OnSpawn()
+    public void TeleportTo( Vector3 p )
     {
-//        state = StoneState.Spawned;
+        gameObject.transform.localPosition = p;
+        objectsync.FlagDiscontinuity();
+    }
+
+    public void Record()
+    {
+        gosys.WriteLog(this);
     }
 
     void OnDrop()
     {
-//        objectsync.FlagDiscontinuity();
-        rigidbody.isKinematic = false;
         state = StoneState.Droped;
     }
 
     void OnPickup()
     {
-        // 石を取った音を全てのPCで再生します。
-        string e = state==StoneState.Spawned ? nameof(PlayPickupSound) : nameof(PlayTakeSound);
-        SendCustomNetworkEvent(NetworkEventTarget.All, e);
-
-        // スポーンされた石を取ったら次の新しい石をスポーンします。
-        if ( state == StoneState.Spawned ) {
-            e = "Spawn" + (isBlack ? "Black" : "White");
-            gosys.SendCustomNetworkEvent(NetworkEventTarget.Owner, e);
-        }
-
-//        rigidbody.constraints = RigidbodyConstraints.None;            
+        if ( state == StoneState.Spawned ) SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PlayPickupSound));
+        if ( state == StoneState.Sended ) SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PlayTakeSound));
         state = StoneState.Pickup;
-        isLoged = false;
     }
 
-    void OnCollisionEnter(Collision col)
+    void OnCollisionStay(Collision col)
     {
         if ( !Networking.IsOwner(gameObject) ) return;
-        if ( state != StoneState.Droped ) return;
 
         // 碁盤に石が当たった音を再生します。
-        if ( col.gameObject.layer==23 && state==StoneState.Droped ) {
-            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PlayStrikeSound));
+        if ( col.gameObject.layer==23 ) {
+            if ( state==StoneState.Droped ) {
+                SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PlayStrikeSound));
+                state = StoneState.Hited;
+            }
         }
 
-        // 碁笥に石を戻した音を再生して石をPoolに戻します。
-        if ( col.gameObject.layer==24 && state==StoneState.Droped ) {
-            state = StoneState.Killing;
-            rigidbody.isKinematic = true;
-            SendCustomEventDelayedSeconds(nameof(SetOwnerToGosysOwner), 2.0f);
-            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PlayReturnSound));
+        if ( col.gameObject.layer==24 ) {
+            MarkerOff();
+            if( state==StoneState.Droped ) {
+                gosys.Respawn(this);
+                SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PlayReturnSound));
+            }
+            state = StoneState.Spawned;
         }
     }
 
-    public void Return()
-    {
-        SendCustomNetworkEvent(NetworkEventTarget.All, nameof(Reset)); 
-        SendCustomEventDelayedSeconds(nameof(Kill), 0.5f);
-    }
-
-    public void Reset()
-    {
-        rigidbody.isKinematic = true;
-        state = StoneState.Spawned;
-    }
-
-    public void Kill() { gosys.killStone(this); }
     public void PlayTakeSound(){ if(audioSource && sndTake) audioSource.PlayOneShot(sndTake); }
     public void PlayNormalSound(){ if(audioSource && sndNormal) audioSource.PlayOneShot(sndNormal); }
     public void PlayStrikeSound() { if(audioSource && sndStrike) audioSource.PlayOneShot(sndStrike); }
     public void PlayPickupSound() { if(audioSource && sndPickup) audioSource.PlayOneShot(sndPickup); }
     public void PlayReturnSound() { if(audioSource && sndReturn) audioSource.PlayOneShot(sndReturn); }
+
+    public void MarkerOn() { gosys.AllMarkerOff(); marker.gameObject.SetActive(true); }
+    public void MarkerOff() { marker.gameObject.SetActive(false); }
 }
