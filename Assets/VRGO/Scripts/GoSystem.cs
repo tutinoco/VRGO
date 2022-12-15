@@ -303,13 +303,14 @@ public class GoSystem : UdonSharpBehaviour
         if( isMark ) SendCustomNetworkEvent(NetworkEventTarget.All, "AllMarkerOff");
 
         Vector3 hiddenPoint = hiddenBox.transform.localPosition;
-        for (int i=0; i<blacks.Length; i++) if ( blacks[i].gameObject.activeSelf ) { bptAry[i]=hiddenPoint; bReturns[i]=true; }
-        for (int i=0; i<whites.Length; i++) if ( whites[i].gameObject.activeSelf ) { wptAry[i]=hiddenPoint; wReturns[i]=true; }
+        for (int i=0; i<blacks.Length; i++) if ( blacks[i].gameObject.activeSelf ) { bptAry[i]=hiddenPoint; /*bReturns[i]=true;*/ }
+        for (int i=0; i<whites.Length; i++) if ( whites[i].gameObject.activeSelf ) { wptAry[i]=hiddenPoint; /*wReturns[i]=true;*/ }
 
+/*
         for (int i=0; i<logSt.Length; i++) { Stone s=logSt[i]; if(s.isBlack) bReturns[s.idx]=false; else wReturns[s.idx]=false; }
         for (int i=0; i<bReturns.Length; i++) if( bReturns[i] ) { blackPool.Return(blacks[i].gameObject); bptAry[i]=(new Vector3[1])[0]; }
         for (int i=0; i<wReturns.Length; i++) if( wReturns[i] ) { whitePool.Return(whites[i].gameObject); wptAry[i]=(new Vector3[1])[0]; }
-
+*/
         for (int i=logSt.Length-1; i>step; i--) {
             Stone s = logSt[i];
             Vector3 p = logPt[i];
