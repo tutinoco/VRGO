@@ -29,8 +29,8 @@ public class Stone : UdonSharpBehaviour
     [Header("VRCObjectSyncを設定します")]
     [SerializeField] private VRCObjectSync objectsync;
 
-    [Header("VRCPickupを設定します")]
-    [SerializeField] private VRCPickup pickup;
+//    [Header("碁石を持ちやすくするためのコライダーを設定します")]
+//    [SerializeField] private Collider pickupCollider;
 
     [Header("マーカーを設定します")]
     [SerializeField] private GameObject marker;
@@ -46,18 +46,21 @@ public class Stone : UdonSharpBehaviour
     [System.NonSerialized] public int idx;
     [System.NonSerialized] public bool isBlack;
 
+//    [SerializeField] private Text info;
+
     private StoneState state = StoneState.Spawned;
 
     void Update()
     {
+//        info.text = state.ToString()+"\n"+Networking.GetOwner(gameObject).displayName.Substring(0,6);
+
+//        pickupCollider.enabled = state==StoneState.Spawned;
+
         if( Networking.IsOwner(gameObject) && state==StoneState.Hited && rigidbody.IsSleeping() ) {
             Debug.Log(state);
             if( gosys.isNormal ) {
-                Vector2Int zahyo = gosys.GetZahyo(gameObject.transform.localPosition);
-                if( Mathf.Abs(zahyo.x) <= 9 && Mathf.Abs(zahyo.y) <= 9 ) {
-                    TeleportTo(gosys.GetNormalPosition(gameObject.transform.localPosition));
-                    SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PlayNormalSound));
-                }
+                TeleportTo(gosys.GetNormalPosition(gameObject.transform.localPosition));
+                SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PlayNormalSound));
             }
             SendCustomNetworkEvent(NetworkEventTarget.All, nameof(OnSleepInOwner));
             state = StoneState.Sended;
@@ -67,7 +70,7 @@ public class Stone : UdonSharpBehaviour
     public void OnSleepInOwner()
     {
         var gosysOwner = Networking.GetOwner(gosys.gameObject);
-        if( Networking.LocalPlayer == gosysOwner && gosys.status!=GoSystemStatus.Kento ) SendCustomEventDelayedSeconds(nameof(Record), 2.0f);
+        if( Networking.LocalPlayer == gosysOwner && !gosys.isKento ) SendCustomEventDelayedSeconds(nameof(Record), 2.0f);
     }
 
     public void TeleportTo( Vector3 p )
@@ -105,7 +108,7 @@ public class Stone : UdonSharpBehaviour
             }
         }
 
-        if ( col.gameObject.layer==24 && state != StoneState.Pickup) {
+        if ( col.gameObject.layer==24 ) {
             MarkerOff();
             if( state==StoneState.Droped ) {
                 gosys.Return(this);
@@ -113,16 +116,6 @@ public class Stone : UdonSharpBehaviour
             }
             state = StoneState.Spawned;
         }
-    }
-
-    public void onHandAreaEnter( Vector3 handPos )
-    {
-        pickup.pickupable = true;
-    }
-
-    public void onHandAreaExit()
-    {
-        pickup.pickupable = false;
     }
 
     public void PlayTakeSound(){ if(audioSource && sndTake) audioSource.PlayOneShot(sndTake); }

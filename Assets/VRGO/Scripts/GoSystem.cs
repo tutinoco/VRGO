@@ -7,13 +7,6 @@ using VRC.SDK3.Components;
 using VRC.Udon;
 using VRC.Udon.Common.Interfaces;
 
-public enum GoSystemStatus
-{
-    Standby,
-    Playing,
-    Kento,
-}
-
 [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
 public class GoSystem : UdonSharpBehaviour
 {
@@ -35,25 +28,17 @@ public class GoSystem : UdonSharpBehaviour
     [SerializeField] private Text blackUserText;
     [SerializeField] private Text whiteUserText;
 
-    [Header("碁石を一時的に隠しておく場所HiddenBoxを設定します")]
-    [SerializeField] private GameObject hiddenBox;
-
-    [Header("プレイエリアを設定します")]
-    [SerializeField] public GameObject playArea;
-
     [UdonSynced(UdonSyncMode.None), FieldChangeCallback(nameof(log))] private string _log = "";
     [UdonSynced(UdonSyncMode.None)] private int pcnt;
     private Stone[] logSt = new Stone[0];
     private Vector3[] logPt = new Vector3[0];
 
-    [UdonSynced(UdonSyncMode.None), FieldChangeCallback(nameof(blackUser))] private int _blackUser;
-    [UdonSynced(UdonSyncMode.None), FieldChangeCallback(nameof(whiteUser))] private int _whiteUser;
+    [UdonSynced(UdonSyncMode.None), FieldChangeCallback(nameof(blackUser))] private string _blackUser = "";
+    [UdonSynced(UdonSyncMode.None), FieldChangeCallback(nameof(whiteUser))] private string _whiteUser = "";
 
     [System.NonSerialized] public bool isNormal;
     [System.NonSerialized] public bool isMark;
-    [System.NonSerialized] public GoSystemStatus status = GoSystemStatus.Standby;
-
-    private Stone tgtStone;
+    [System.NonSerialized] public bool isKento;
 
     public void Resync() { ReadLog(pcnt); }
 
@@ -72,8 +57,8 @@ public class GoSystem : UdonSharpBehaviour
     public void MarkOn() { isMark = true; UpdateMark(); }
     public void MarkOff() { isMark = false; AllMarkerOff(); }
 
-    public void KentoOn() { if ( logSt.Length > 0 ) { status=GoSystemStatus.Kento; ReadLog(pcnt=-1); sgfField.text=GetSgf(); } }
-    public void KentoOff() { status=GoSystemStatus.Playing; ReadLog(pcnt=-1); }
+    public void KentoOn() { if ( logSt.Length > 0 ) { isKento = true; ReadLog(pcnt=-1); sgfField.text=GetSgf(); } }
+    public void KentoOff() { isKento = false; ReadLog(pcnt=-1); }
 
     public string log {
         set {
@@ -103,12 +88,12 @@ public class GoSystem : UdonSharpBehaviour
         get { return _log; }
     }
 
-    public int blackUser {
+    public string blackUser {
         set { _blackUser = value; ShowUserName(true, value); }
         get { return _blackUser; }
     }
 
-    public int whiteUser {
+    public string whiteUser {
         set { _whiteUser = value; ShowUserName(false, value); }
         get { return _whiteUser; }
     }
@@ -136,42 +121,6 @@ public class GoSystem : UdonSharpBehaviour
     void Update()
     {
         if ( Networking.IsOwner(gameObject) ) TryToSpawn();
-        //HogeHoge();
-    }
-
-    private void HogeHoge()
-    {
-        VRCPlayerApi player = Networking.LocalPlayer;
-//        if ( !player.IsUserInVR() ) return;
-
-        Vector3 p = player.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand).position;
-        RaycastHit hit;
-        Ray ray = new Ray(p, new Vector3(0, -1, 0));
-        if ( Physics.Raycast(ray, out hit, Mathf.Infinity, 1 << 22) ) {
-            Debug.DrawRay(hit.point, hit.normal, Color.green);//            if( hit != null ) tgtGobj.transform.position = hit.point;
-        }
-
-        /*
-        bool e = false;
-        Vector3 p = player.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand).position;
-        RaycastHit hit;
-        Ray ray = new Ray(p, new Vector3(0, -1, 0));
-        if ( Physics.Raycast(ray, out hit, Mathf.Infinity, 1 << 22) ) {
-            if( hit.collider == null ) e = true;
-            else {
-                Stone s = (Stone)hit.collider.gameObject.transform.GetComponent(typeof(UdonBehaviour));
-                s.onHandAreaEnter(p);
-                if( tgtStone != s ) e = true;
-
-                tgtGobj.transform.position = hit.point;
-            }
-
-            if ( e && tgtStone!=null ) {
-                tgtStone.onHandAreaExit();
-                tgtStone = null;
-            }
-        }
-        */
     }
 
     private void TryToSpawn()
@@ -187,13 +136,13 @@ public class GoSystem : UdonSharpBehaviour
 
     public void Return( Stone s )
     {
-        s.transform.localPosition = GetSpawnPoint(s.isBlack);
+        s.transform.position = GetSpawnPoint(s.isBlack);
         s.transform.rotation = Quaternion.Euler(-90, UnityEngine.Random.Range(0f,360f), 0);
     }
 
     private Vector3 GetSpawnPoint( bool isBlack )
     {
-        Vector3 p = isBlack ? blackPool.gameObject.transform.localPosition : whitePool.gameObject.transform.localPosition;
+        Vector3 p = isBlack ? blackPool.gameObject.transform.position : whitePool.gameObject.transform.position;
         return new Vector3(p.x+UnityEngine.Random.Range(-0.001f,0.001f), p.y, p.z+UnityEngine.Random.Range(-0.001f,0.001f));
     }
 
@@ -203,28 +152,11 @@ public class GoSystem : UdonSharpBehaviour
         Networking.SetOwner(Networking.LocalPlayer, gameObject);
         Networking.SetOwner(Networking.LocalPlayer, blackPool.gameObject);
         Networking.SetOwner(Networking.LocalPlayer, whitePool.gameObject);
-        for (int i=0; i<blacks.Length; i++) Networking.SetOwner(Networking.LocalPlayer, blacks[i].gameObject);
-        for (int i=0; i<whites.Length; i++) Networking.SetOwner(Networking.LocalPlayer, whites[i].gameObject);
-        foreach (Stone s in whites) {
-            GameObject g = s.gameObject;
-            Networking.SetOwner(Networking.LocalPlayer, g);
-            if( g.activeSelf ) whitePool.Return( g );
-        }
-        foreach (Stone s in blacks) {
-            GameObject g = s.gameObject;
-            Networking.SetOwner(Networking.LocalPlayer, g);
-            if( g.activeSelf ) blackPool.Return( g );
-        }
+        for (int i=0; i<blackPool.Pool.Length; i++) Networking.SetOwner(Networking.LocalPlayer, blackPool.Pool[i]);
+        for (int i=0; i<whitePool.Pool.Length; i++) Networking.SetOwner(Networking.LocalPlayer, whitePool.Pool[i]);
 
-        log = "";
-        pcnt = 0;
-        blackUser = 0;
-        whiteUser = 0;
-        logSt = new Stone[0];
-        logPt = new Vector3[0];   
-        status = GoSystemStatus.Standby;
-
-        RequestSerialization();
+        // 全てのPCで全ての石を戻す
+        SendCustomNetworkEvent(NetworkEventTarget.All, nameof(Initialize));
     }
 
     private void UpdateMark()
@@ -240,6 +172,19 @@ public class GoSystem : UdonSharpBehaviour
         foreach (Stone s in whites) if( s.gameObject.activeSelf ) s.MarkerOff();
     }
 
+    public void Initialize()
+    {
+        log = "";
+        pcnt = 0;
+        blackUser = "";
+        whiteUser = "";
+        logSt = new Stone[0];
+        logPt = new Vector3[0];
+
+        foreach (Stone s in blacks) if( s.gameObject.activeSelf ) blackPool.Return( s.gameObject );
+        foreach (Stone s in whites) if( s.gameObject.activeSelf ) whitePool.Return( s.gameObject );
+    }
+
     public Vector2Int GetZahyo( Vector3 pos )
     {
         return new Vector2Int((int)Mathf.Round(pos.x/roWidth),(int)Mathf.Round(pos.z/roHeight));
@@ -251,22 +196,19 @@ public class GoSystem : UdonSharpBehaviour
         return new Vector3((float)zahyo.x*roWidth, pos.y, (float)zahyo.y*roHeight);
     }
 
-    private void ShowUserName( bool isBlack, int playerId )
+    private void ShowUserName( bool isBlack, string name )
     {
-        string name = playerId>0 ? VRCPlayerApi.GetPlayerById(playerId).displayName : "";
         Text t = isBlack ? blackUserText : whiteUserText;
-        String s = (isBlack?"黒":"白")+"\n<size=36>"+name+"</size>";
-        t.text = name=="" ? "" : s;
+        String s = (isBlack?"黒":"白");
+        t.text = name=="" ? s : s+": "+name;
     }
 
     public void WriteLog( Stone s )
     {
-        if( status == GoSystemStatus.Standby ) status = GoSystemStatus.Playing;
-
         // 初手のユーザ名を記録
-        int playerId = Networking.GetOwner(s.gameObject).playerId;
-        if( s.isBlack && blackUser==0 ) blackUser = playerId;
-        if( !s.isBlack && whiteUser==0 ) whiteUser = playerId;
+        string name = Networking.GetOwner(s.gameObject).displayName;
+        if( s.isBlack && blackUser=="" ) blackUser = name;
+        if( !s.isBlack && whiteUser=="" ) whiteUser = name;
 
         if( logSt.Length > 0 ) {
 
@@ -297,20 +239,14 @@ public class GoSystem : UdonSharpBehaviour
     {
         Vector3[] bptAry = new Vector3[blacks.Length];
         Vector3[] wptAry = new Vector3[whites.Length];
-        bool[] bReturns = new bool[blacks.Length];
-        bool[] wReturns = new bool[whites.Length];
 
         if( isMark ) SendCustomNetworkEvent(NetworkEventTarget.All, "AllMarkerOff");
 
-        Vector3 hiddenPoint = hiddenBox.transform.localPosition;
-        for (int i=0; i<blacks.Length; i++) if ( blacks[i].gameObject.activeSelf ) { bptAry[i]=hiddenPoint; /*bReturns[i]=true;*/ }
-        for (int i=0; i<whites.Length; i++) if ( whites[i].gameObject.activeSelf ) { wptAry[i]=hiddenPoint; /*wReturns[i]=true;*/ }
+        Vector3 blackSpawnPoint = GetSpawnPoint(true);
+        Vector3 whiteSpawnPoint = GetSpawnPoint(false);
+        for (int i=0; i<blacks.Length; i++) if ( blacks[i].gameObject.activeSelf ) bptAry[i] = blackSpawnPoint;
+        for (int i=0; i<whites.Length; i++) if ( whites[i].gameObject.activeSelf ) wptAry[i] = whiteSpawnPoint;
 
-/*
-        for (int i=0; i<logSt.Length; i++) { Stone s=logSt[i]; if(s.isBlack) bReturns[s.idx]=false; else wReturns[s.idx]=false; }
-        for (int i=0; i<bReturns.Length; i++) if( bReturns[i] ) { blackPool.Return(blacks[i].gameObject); bptAry[i]=(new Vector3[1])[0]; }
-        for (int i=0; i<wReturns.Length; i++) if( wReturns[i] ) { whitePool.Return(whites[i].gameObject); wptAry[i]=(new Vector3[1])[0]; }
-*/
         for (int i=logSt.Length-1; i>step; i--) {
             Stone s = logSt[i];
             Vector3 p = logPt[i];
@@ -338,7 +274,6 @@ public class GoSystem : UdonSharpBehaviour
             s.TeleportTo(p1);
         }
 
-        Networking.SetOwner(Networking.LocalPlayer, gameObject);
         pcnt = step;
         RequestSerialization();
     }
@@ -346,9 +281,7 @@ public class GoSystem : UdonSharpBehaviour
     public string GetSgf()
     {
         DateTime dt = DateTime.Now;
-        string blackName = blackUser > 0 ? VRCPlayerApi.GetPlayerById(blackUser).displayName : "NO NAME";
-        string whiteName = whiteUser > 0 ? VRCPlayerApi.GetPlayerById(whiteUser).displayName : "NO NAME";
-        string sgf = "(;AP[VRGO:1.0]SZ["+roNumber+"]PB["+blackName+"]PW["+whiteName+"]KM[6.5]DT["+dt.Year.ToString()+"-"+dt.Month.ToString()+"-"+dt.Day.ToString()+"]";
+        string sgf = "(;AP[VRGO:1.0]SZ["+roNumber+"]PB["+blackUser+"]PW["+whiteUser+"]KM[6.5]DT["+dt.Year.ToString()+"-"+dt.Month.ToString()+"-"+dt.Day.ToString()+"]";
 
         bool prevIsBlack = false;
         for (int i=logSt.Length-1; i>=0; i--) {
