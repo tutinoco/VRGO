@@ -887,10 +887,10 @@ MonoBehaviour:
       Data: _blackUser
     - Name: <UserType>k__BackingField
       Entry: 9
-      Data: 42
+      Data: 25
     - Name: <SystemType>k__BackingField
       Entry: 9
-      Data: 42
+      Data: 25
     - Name: <SyncMode>k__BackingField
       Entry: 7
       Data: System.Nullable`1[[UdonSharp.UdonSyncMode, UdonSharp.Runtime]], mscorlib
@@ -947,10 +947,10 @@ MonoBehaviour:
       Data: _whiteUser
     - Name: <UserType>k__BackingField
       Entry: 9
-      Data: 42
+      Data: 25
     - Name: <SystemType>k__BackingField
       Entry: 9
-      Data: 42
+      Data: 25
     - Name: <SyncMode>k__BackingField
       Entry: 7
       Data: System.Nullable`1[[UdonSharp.UdonSyncMode, UdonSharp.Runtime]], mscorlib
