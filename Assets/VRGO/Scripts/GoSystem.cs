@@ -120,11 +120,12 @@ public class GoSystem : UdonSharpBehaviour
 
     void Update()
     {
-        if ( Networking.IsOwner(gameObject) ) TryToSpawn();
+        TryToSpawn();
     }
 
     private void TryToSpawn()
     {
+        if ( !Networking.IsOwner(gameObject) ) return;
         RaycastHit hit;
         Vector3 p = blackPool.gameObject.transform.position;
         Ray ray = new Ray(new Vector3(p.x, p.y+0.5f, p.z), new Vector3(0, -1, 0));
@@ -181,8 +182,8 @@ public class GoSystem : UdonSharpBehaviour
         logSt = new Stone[0];
         logPt = new Vector3[0];
 
-        foreach (Stone s in blacks) if( s.gameObject.activeSelf ) blackPool.Return( s.gameObject );
-        foreach (Stone s in whites) if( s.gameObject.activeSelf ) whitePool.Return( s.gameObject );
+        if ( Networking.IsOwner(blackPool.gameObject) ) foreach (Stone s in blacks) if( s.gameObject.activeSelf ) blackPool.Return( s.gameObject );
+        if ( Networking.IsOwner(whitePool.gameObject) ) foreach (Stone s in whites) if( s.gameObject.activeSelf ) whitePool.Return( s.gameObject );
     }
 
     public Vector2Int GetZahyo( Vector3 pos )

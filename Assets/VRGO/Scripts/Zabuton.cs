@@ -16,7 +16,8 @@ public class Zabuton : UdonSharpBehaviour
     void Update()
     {
         Vector3 p = gameObject.transform.localPosition;
-        gameObject.transform.localPosition = new Vector3(0,Mathf.Max(Mathf.Min(p.y,0.7f),0.0f),0);
+        gameObject.transform.localPosition = new Vector3(0,Mathf.Max(Mathf.Min(p.y,0.32f),0.0f),0);
+        gameObject.transform.rotation = Quaternion.Euler(0,0,0);
         model.gameObject.transform.localPosition = gameObject.transform.localPosition;
     }
 }
