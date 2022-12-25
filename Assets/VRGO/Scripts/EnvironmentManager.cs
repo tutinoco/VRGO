@@ -7,45 +7,65 @@ using VRC.Udon;
 public class EnvironmentManager : UdonSharpBehaviour
 {
     [Header("管理するGoManagerを設定します")]
-    [SerializeField] private GoSystem[] gosyss;
-    [SerializeField] private GameObject[] screens;
-    [SerializeField] private GameObject[] playAreas;
-    [SerializeField] private GameObject[] cameras;
+    [SerializeField] private GameObject goSystemsGobj;
+    [SerializeField] private GameObject screensGobj;
+
+    private GoSystem[] goSystems;
+    private GameObject[] playAreas;
+    private GameObject[] screens;
 
     [UdonSynced(UdonSyncMode.None), FieldChangeCallback(nameof(goValue))] private int _goValue;
     public int goValue {
         set {
             _goValue = value;
-            int h = gosyss.Length / 2;
-            for (int i=0; i<gosyss.Length; i++) {
+            int h = goSystems.Length / 2;
+            for (int i=0; i<goSystems.Length; i++) {
                 bool b = i >= h-_goValue && i <= h+_goValue;
-                gosyss[i].gameObject.SetActive(b);
+                goSystems[i].gameObject.SetActive(b);
             }
         }
         get { return _goValue; }
     }
 
+    void Start()
+    {
+        int len1 = goSystemsGobj.transform.childCount;
+        goSystems = new GoSystem[len1];
+        playAreas = new GameObject[len1];
+        for (int i=0; i<len1; i++) {
+            goSystems[i] = (GoSystem)goSystemsGobj.transform.GetChild(i).GetComponent(typeof(UdonBehaviour));
+            playAreas[i] = goSystems[i].transform.Find("PlayArea").gameObject;
+        }
+
+        int len2 = screensGobj.transform.childCount;
+        screens = new GameObject[len2];
+        for (int i=0; i<len2; i++) {
+            GameObject screen = screensGobj.transform.GetChild(0).gameObject; // SetParentの影響でunshiftする形となるためインデックスは0になります。
+            screens[i] = screen.transform.Find("Screen").gameObject;
+            screen.transform.SetParent(goSystems[i].gameObject.transform);
+            screen.transform.Find("Camera").SetParent(playAreas[i].transform);
+            goSystems[i].gameObject.transform.Find("PlayerNames").SetParent(screens[i].transform);
+        }
+
+        if ( !Networking.IsOwner(gameObject) ) return;
+        goValue = 1;
+        RequestSerialization();
+    }
+
     public void AddGo()
     {
         if ( !Networking.IsOwner(gameObject) ) return;
-        goValue = Mathf.Max(Mathf.Min(goValue+1, gosyss.Length/2),0);
+        goValue = Mathf.Max(Mathf.Min(goValue+1, goSystems.Length/2),0);
         RequestSerialization();
     }
 
     public void SubGo()
     {
         if ( !Networking.IsOwner(gameObject) ) return;
-        goValue = Mathf.Max(Mathf.Min(goValue-1, gosyss.Length/2),0);
+        goValue = Mathf.Max(Mathf.Min(goValue-1, goSystems.Length/2),0);
         RequestSerialization();
     }
     
-    void Start()
-    {
-        if ( !Networking.IsOwner(gameObject) ) return;
-        goValue = 1;
-        RequestSerialization();
-    }
-
     public override void OnPlayerJoined(VRCPlayerApi player)
     {
         
@@ -53,32 +73,35 @@ public class EnvironmentManager : UdonSharpBehaviour
 
     public void SimulOn()
     {
-/*        foreach (GoSystem gs in gosyss) {
+/*        foreach (GoSystem gs in goSystems) {
             Debug.Log("status: "+gs.status);
-            if( gs.status != GoSystemStatus.Standby ) return;
+            if( gs.status != goSystemsGobjtatus.Standby ) return;
         }
 */
-        for (int i=0; i<gosyss.Length; i++) {
-            int h = gosyss.Length / 2;
+        for (int i=0; i<goSystems.Length; i++) {
+            int h = goSystems.Length / 2;
             float w = 1.5f;
-            gosyss[i].gameObject.transform.position = new Vector3(-h*w+i*w, 0, 0);
+            goSystems[i].gameObject.transform.position = new Vector3(-h*w+i*w, 0, 0);
             playAreas[i].gameObject.transform.rotation = Quaternion.Euler(0,90,0);
-            cameras[i].gameObject.transform.rotation = Quaternion.Euler(90,180,0);
             screens[i].gameObject.transform.localScale = new Vector3(1.0f, 1.0f, 1.0f);
         }
     }
 
     public void SimulOff() {
-//        foreach (GoSystem gs in gosyss) if( gs.status != GoSystemStatus.Standby ) return;
+//        foreach (GoSystem gs in goSystems) if( gs.status != goSystemsGobjtatus.Standby ) return;
 
-        for (int i=0; i<gosyss.Length; i++) {
-            GoSystem gosys = gosyss[i];
-            int h = gosyss.Length / 2;
+        for (int i=0; i<goSystems.Length; i++) {
+            GoSystem gosys = goSystems[i];
+            int h = goSystems.Length / 2;
             float w = 5.0f;
-            gosyss[i].gameObject.transform.position = new Vector3(-h*w+i*w, 0, 0);
+            goSystems[i].gameObject.transform.position = new Vector3(-h*w+i*w, 0, 0);
             playAreas[i].gameObject.transform.rotation = Quaternion.Euler(0,0,0);
-            cameras[i].gameObject.transform.rotation = Quaternion.Euler(90,90,0);
             screens[i].gameObject.transform.localScale = new Vector3(1.6f, 1.6f, 1.6f);
         }
     }
+
+    public void NormalOn() { foreach(GoSystem gs in goSystems) gs.NormalOn(); }
+    public void NormalOff() { foreach(GoSystem gs in goSystems) gs.NormalOff(); }
+    public void MarkOn() { foreach(GoSystem gs in goSystems) gs.MarkOn(); }
+    public void MarkOff() { foreach(GoSystem gs in goSystems) gs.MarkOff(); }
 }
