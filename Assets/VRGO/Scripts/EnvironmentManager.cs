@@ -99,9 +99,4 @@ public class EnvironmentManager : UdonSharpBehaviour
             screens[i].gameObject.transform.localScale = new Vector3(1.6f, 1.6f, 1.6f);
         }
     }
-
-    public void NormalOn() { foreach(GoSystem gs in goSystems) gs.NormalOn(); }
-    public void NormalOff() { foreach(GoSystem gs in goSystems) gs.NormalOff(); }
-    public void MarkOn() { foreach(GoSystem gs in goSystems) gs.MarkOn(); }
-    public void MarkOff() { foreach(GoSystem gs in goSystems) gs.MarkOff(); }
 }
