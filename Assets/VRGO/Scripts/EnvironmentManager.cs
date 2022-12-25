@@ -81,8 +81,8 @@ public class EnvironmentManager : UdonSharpBehaviour
         for (int i=0; i<goSystems.Length; i++) {
             int h = goSystems.Length / 2;
             float w = 1.5f;
-            goSystems[i].gameObject.transform.position = new Vector3(-h*w+i*w, 0, 0);
-            playAreas[i].gameObject.transform.rotation = Quaternion.Euler(0,90,0);
+            goSystems[i].gameObject.transform.localPosition = new Vector3(-h*w+i*w, 0, 0);
+            playAreas[i].gameObject.transform.localRotation = Quaternion.Euler(0,90,0);
             screens[i].gameObject.transform.localScale = new Vector3(1.0f, 1.0f, 1.0f);
         }
     }
@@ -94,8 +94,8 @@ public class EnvironmentManager : UdonSharpBehaviour
             GoSystem gosys = goSystems[i];
             int h = goSystems.Length / 2;
             float w = 5.0f;
-            goSystems[i].gameObject.transform.position = new Vector3(-h*w+i*w, 0, 0);
-            playAreas[i].gameObject.transform.rotation = Quaternion.Euler(0,0,0);
+            goSystems[i].gameObject.transform.localPosition = new Vector3(-h*w+i*w, 0, 0);
+            playAreas[i].gameObject.transform.localRotation = Quaternion.Euler(0,0,0);
             screens[i].gameObject.transform.localScale = new Vector3(1.6f, 1.6f, 1.6f);
         }
     }
