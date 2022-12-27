@@ -26,6 +26,9 @@ public class GoSystem : UdonSharpBehaviour
     [SerializeField] private InputField sgfInputField;
     [SerializeField] private InputField sgfOutputField;
 
+    [Header("プレイ時間を表示するTextを設定します")]
+    [SerializeField] private Text playTimeText;
+
     [Header("プレイヤー名を表示するTextを設定します")]
     [SerializeField] private Text blackUserText;
     [SerializeField] private Text whiteUserText;
@@ -40,6 +43,7 @@ public class GoSystem : UdonSharpBehaviour
 
     [UdonSynced(UdonSyncMode.None), FieldChangeCallback(nameof(blackUser))] private string _blackUser;
     [UdonSynced(UdonSyncMode.None), FieldChangeCallback(nameof(whiteUser))] private string _whiteUser;
+    [UdonSynced(UdonSyncMode.None)] private double startTime;
 
     [System.NonSerialized] public bool isNormal;
     [System.NonSerialized] public bool isMark;
@@ -121,11 +125,41 @@ public class GoSystem : UdonSharpBehaviour
             s.isBlack = false;
             whites[i] = s;
         }
+
+        SendCustomEventDelayedSeconds(nameof(UpdateOneSeconds), 1.0f);
     }
 
-    void Update()
+    public void UpdateOneSeconds()
     {
         TryToSpawn();
+        UpdatePlayTime();
+        SendCustomEventDelayedSeconds(nameof(UpdateOneSeconds), 1.0f);
+    }
+
+    public DateTime ToDatetime(double _unixTime)
+    {
+        DateTime ReturnTime = new DateTime(1970, 1, 1, 0, 0, 0, System.DateTimeKind.Utc);
+        ReturnTime = ReturnTime.AddSeconds(_unixTime);
+        return ReturnTime;
+    }
+
+    public double ToUnixDateTime(DateTime dateTime)
+    {
+        DateTime UnixTime = new DateTime(1970, 1, 1, 0, 0, 0, 0);
+        return (double)(dateTime - UnixTime).TotalSeconds;
+    }
+
+    public void UpdatePlayTime()
+    {
+        if ( isKento ) return;
+        if ( startTime == 0 ) playTimeText.text = "";
+        else {
+            int totalSec = (int)(ToUnixDateTime(DateTime.Now) - startTime);
+            int s = totalSec % 60;
+            int m = totalSec / 60 % 60;
+            int h = totalSec / 60 / 60;
+            playTimeText.text = "プレイ時間 <size=38>"+h.ToString("00")+":"+m.ToString("00")+":"+s.ToString("00")+"</size>";
+        }
     }
 
     private void TryToSpawn()
@@ -189,6 +223,7 @@ public class GoSystem : UdonSharpBehaviour
         pcnt = 0;
         blackUser = "";
         whiteUser = "";
+        startTime = 0;
         logSt = new Stone[0];
         logPt = new Vector3[0];
 
@@ -218,6 +253,7 @@ public class GoSystem : UdonSharpBehaviour
     {
         // 初手のプレイヤーIDを記録
         int playerId = Networking.GetOwner(s.gameObject).playerId;
+        if( startTime == 0 ) startTime = ToUnixDateTime(DateTime.Now);
         if( s.isBlack && blackUser=="" ) blackUser = VRCPlayerApi.GetPlayerById(playerId).displayName;
         if( !s.isBlack && whiteUser=="" ) whiteUser = VRCPlayerApi.GetPlayerById(playerId).displayName;
 
@@ -332,7 +368,7 @@ public class GoSystem : UdonSharpBehaviour
 
     public void GetSgf()
     {
-        DateTime dt = DateTime.Now;
+        DateTime dt = ToDatetime(startTime);
         string blackName = blackUser != "" ? blackUser : "NO NAME";
         string whiteName = whiteUser != "" ? whiteUser : "NO NAME";
         string sgf = "(;AP[VRGO:1.0]SZ["+roNumber+"]PB["+blackName+"]PW["+whiteName+"]KM[6.5]DT["+dt.Year.ToString()+"-"+dt.Month.ToString()+"-"+dt.Day.ToString()+"]";
