@@ -6,6 +6,7 @@ using VRC.SDKBase;
 using VRC.SDK3.Components;
 using VRC.Udon;
 using VRC.Udon.Common.Interfaces;
+using tutinoco;
 
 [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
 public class GoSystem : UdonSharpBehaviour
@@ -21,20 +22,24 @@ public class GoSystem : UdonSharpBehaviour
     [SerializeField] private float roHeight;
     [SerializeField] private int roNumber;    
 
-    [Header("SGFの出力先となるInputFieldを設定します")]
-    [SerializeField] private InputField sgfField;
+    [Header("SGFの入出力先となるInputFieldを設定します")]
+    [SerializeField] private InputField sgfInputField;
+    [SerializeField] private InputField sgfOutputField;
 
     [Header("プレイヤー名を表示するTextを設定します")]
     [SerializeField] private Text blackUserText;
     [SerializeField] private Text whiteUserText;
+
+    [Header("連動して動作するスイッチを登録します")]
+    [SerializeField] private BenriSwitch kentoSwitch;
 
     [UdonSynced(UdonSyncMode.None), FieldChangeCallback(nameof(log))] private string _log = "";
     [UdonSynced(UdonSyncMode.None)] private int pcnt;
     private Stone[] logSt = new Stone[0];
     private Vector3[] logPt = new Vector3[0];
 
-    [UdonSynced(UdonSyncMode.None), FieldChangeCallback(nameof(blackUser))] private int _blackUser;
-    [UdonSynced(UdonSyncMode.None), FieldChangeCallback(nameof(whiteUser))] private int _whiteUser;
+    [UdonSynced(UdonSyncMode.None), FieldChangeCallback(nameof(blackUser))] private string _blackUser;
+    [UdonSynced(UdonSyncMode.None), FieldChangeCallback(nameof(whiteUser))] private string _whiteUser;
 
     [System.NonSerialized] public bool isNormal;
     [System.NonSerialized] public bool isMark;
@@ -57,7 +62,7 @@ public class GoSystem : UdonSharpBehaviour
     public void MarkOn() { isMark = true; UpdateMark(); }
     public void MarkOff() { isMark = false; AllMarkerOff(); }
 
-    public void KentoOn() { if ( logSt.Length > 0 ) { isKento = true; ReadLog(pcnt=-1); sgfField.text=GetSgf(); } }
+    public void KentoOn() { if ( logSt.Length > 0 ) { isKento = true; ReadLog(pcnt=-1); } }
     public void KentoOff() { isKento = false; ReadLog(pcnt=-1); }
 
     public string log {
@@ -88,12 +93,12 @@ public class GoSystem : UdonSharpBehaviour
         get { return _log; }
     }
 
-    public int blackUser {
+    public string blackUser {
         set { _blackUser = value; ShowUserName(true, value); }
         get { return _blackUser; }
     }
 
-    public int whiteUser {
+    public string whiteUser {
         set { _whiteUser = value; ShowUserName(false, value); }
         get { return _whiteUser; }
     }
@@ -125,14 +130,19 @@ public class GoSystem : UdonSharpBehaviour
 
     private void TryToSpawn()
     {
-        if ( !Networking.IsOwner(gameObject) ) return;
         RaycastHit hit;
-        Vector3 p = blackPool.gameObject.transform.position;
-        Ray ray = new Ray(new Vector3(p.x, p.y+0.5f, p.z), new Vector3(0, -1, 0));
-        if ( Physics.Raycast(ray, out hit) && hit.collider!=null && hit.collider.gameObject.layer==24 ) blackPool.TryToSpawn();
-        p = whitePool.gameObject.transform.position;
-        ray = new Ray(new Vector3(p.x, p.y+0.5f, p.z), new Vector3(0, -1, 0));
-        if ( Physics.Raycast(ray, out hit) && hit.collider!=null && hit.collider.gameObject.layer==24 ) whitePool.TryToSpawn();
+
+        if ( Networking.IsOwner(blackPool.gameObject) ) {
+            Vector3 p = blackPool.gameObject.transform.position;
+            Ray ray = new Ray(new Vector3(p.x, p.y+0.5f, p.z), new Vector3(0, -1, 0));
+            if ( Physics.Raycast(ray, out hit) && hit.collider!=null && hit.collider.gameObject.layer==24 ) blackPool.TryToSpawn();
+        }
+
+        if ( Networking.IsOwner(whitePool.gameObject) ) {
+            Vector3 p = whitePool.gameObject.transform.position;
+            Ray ray = new Ray(new Vector3(p.x, p.y+0.5f, p.z), new Vector3(0, -1, 0));
+            if ( Physics.Raycast(ray, out hit) && hit.collider!=null && hit.collider.gameObject.layer==24 ) whitePool.TryToSpawn();
+        }
     }
 
     public void Return( Stone s )
@@ -177,8 +187,8 @@ public class GoSystem : UdonSharpBehaviour
     {
         log = "";
         pcnt = 0;
-        blackUser = 0;
-        whiteUser = 0;
+        blackUser = "";
+        whiteUser = "";
         logSt = new Stone[0];
         logPt = new Vector3[0];
 
@@ -197,9 +207,8 @@ public class GoSystem : UdonSharpBehaviour
         return new Vector3((float)zahyo.x*roWidth, pos.y, (float)zahyo.y*roHeight);
     }
 
-    private void ShowUserName( bool isBlack, int playerId )
+    private void ShowUserName( bool isBlack, string name )
     {
-        string name = playerId>0 ? VRCPlayerApi.GetPlayerById(playerId).displayName : "";
         Text t = isBlack ? blackUserText : whiteUserText;
         String s = (isBlack?"黒":"白");
         t.text = name=="" ? s : s+": "+name;
@@ -209,8 +218,8 @@ public class GoSystem : UdonSharpBehaviour
     {
         // 初手のプレイヤーIDを記録
         int playerId = Networking.GetOwner(s.gameObject).playerId;
-        if( s.isBlack && blackUser==0 ) blackUser = playerId;
-        if( !s.isBlack && whiteUser==0 ) whiteUser = playerId;
+        if( s.isBlack && blackUser=="" ) blackUser = VRCPlayerApi.GetPlayerById(playerId).displayName;
+        if( !s.isBlack && whiteUser=="" ) whiteUser = VRCPlayerApi.GetPlayerById(playerId).displayName;
 
         if( logSt.Length > 0 ) {
 
@@ -229,7 +238,7 @@ public class GoSystem : UdonSharpBehaviour
 
         // ログを取る
         Vector3 pos = s.transform.localPosition;
-        string line = (s.isBlack?"B":"W")+s.idx+','+pos.x+','+pos.y+','+pos.z;
+        string line = (s.isBlack?"B":"W")+s.idx+","+pos.x+","+pos.y+","+pos.z;
         if ( log == "" ) log = line;
         else log = line+'\n'+log;
 
@@ -281,11 +290,51 @@ public class GoSystem : UdonSharpBehaviour
         RequestSerialization();
     }
 
-    public string GetSgf()
+    public void SetSgf()
+    {
+        Reset();
+        int idx;
+        string sgf = sgfInputField.text;
+
+        idx = sgf.IndexOf("SZ[");
+        if( idx == -1 ) { sgfInputField.text="ERROR!"; return; }else{ idx+=3; }
+        int ro = int.Parse(sgf.Substring(idx, sgf.IndexOf("]",idx)-idx));
+
+        foreach( string s in new String[]{"PB", "PW"} ) {
+            idx = sgf.IndexOf(s+"[");
+            if( idx == -1 ) continue;
+            idx+=3;
+            string name = sgf.Substring(idx, sgf.IndexOf("]",idx)-idx);
+            if( s == "PB" ) blackUser = name; else whiteUser = name;
+        }
+
+        int bcnt = -1;
+        int wcnt = -1;
+        string[] data = sgf.Split(';');
+
+        for (int i=2; i<data.Length; i++) {
+            char type = data[i][0];
+            int h = (int)Mathf.Round(roNumber/2);
+            float x = (data[i][2]-97-h-3) * roWidth;
+            float y = (data[i][3]-97-h-3) * roHeight;
+
+            GameObject g = type=='B' ? blackPool.TryToSpawn() : whitePool.TryToSpawn();
+            Stone s = (Stone)g.transform.GetComponent(typeof(UdonBehaviour));
+
+            string line = type+""+s.idx+","+x+","+0+","+y;
+            if ( log == "" ) log = line;
+            else log = line+'\n'+log;
+        }
+
+        if ( !kentoSwitch.isON ) kentoSwitch.Interact();
+        else ReadLog(pcnt=-1);
+    }
+
+    public void GetSgf()
     {
         DateTime dt = DateTime.Now;
-        string blackName = blackUser > 0 ? VRCPlayerApi.GetPlayerById(blackUser).displayName : "NO NAME";
-        string whiteName = whiteUser > 0 ? VRCPlayerApi.GetPlayerById(whiteUser).displayName : "NO NAME";
+        string blackName = blackUser != "" ? blackUser : "NO NAME";
+        string whiteName = whiteUser != "" ? whiteUser : "NO NAME";
         string sgf = "(;AP[VRGO:1.0]SZ["+roNumber+"]PB["+blackName+"]PW["+whiteName+"]KM[6.5]DT["+dt.Year.ToString()+"-"+dt.Month.ToString()+"-"+dt.Day.ToString()+"]";
 
         bool prevIsBlack = false;
@@ -302,6 +351,6 @@ public class GoSystem : UdonSharpBehaviour
         }
         
         sgf += ")";
-        return sgf;
+        sgfOutputField.text = sgf;
     }
 }
