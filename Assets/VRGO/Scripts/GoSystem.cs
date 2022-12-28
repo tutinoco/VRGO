@@ -275,8 +275,7 @@ public class GoSystem : UdonSharpBehaviour
         // ログを取る
         Vector3 pos = s.transform.localPosition;
         string line = (s.isBlack?"B":"W")+s.idx+","+pos.x+","+pos.y+","+pos.z;
-        if ( log == "" ) log = line;
-        else log = line+'\n'+log;
+        log = log=="" ? line : line+'\n'+log;
 
         // 全てのPCでログを更新
         RequestSerialization();
@@ -326,40 +325,38 @@ public class GoSystem : UdonSharpBehaviour
         RequestSerialization();
     }
 
+    private string getSgfValue(string sgf, string name, string def)
+    {
+        int i = sgf.IndexOf(name);
+        if ( i == -1 ) return def;
+        i = sgf.IndexOf("[", i) + 1;
+        return sgf.Substring(i, sgf.IndexOf("]",i)-i);
+    }
+
     public void SetSgf()
     {
         Reset();
-        int idx;
+
         string sgf = sgfInputField.text;
+        int ro = int.Parse(getSgfValue(sgf,"SZ","19"));
+        blackUser = getSgfValue(sgf,"PB","NO NAME");
+        whiteUser = getSgfValue(sgf,"PW","NO NAME");
 
-        idx = sgf.IndexOf("SZ[");
-        if( idx == -1 ) { sgfInputField.text="ERROR!"; return; }else{ idx+=3; }
-        int ro = int.Parse(sgf.Substring(idx, sgf.IndexOf("]",idx)-idx));
-
-        foreach( string s in new String[]{"PB", "PW"} ) {
-            idx = sgf.IndexOf(s+"[");
-            if( idx == -1 ) continue;
-            idx+=3;
-            string name = sgf.Substring(idx, sgf.IndexOf("]",idx)-idx);
-            if( s == "PB" ) blackUser = name; else whiteUser = name;
-        }
-
-        int bcnt = -1;
-        int wcnt = -1;
+        int bcnt=-1;
+        int wcnt=-1;
         string[] data = sgf.Split(';');
+
+        if ( data.Length < 2 ) { sgfInputField.text = "ERROR!"; return; }
 
         for (int i=2; i<data.Length; i++) {
             char type = data[i][0];
-            int h = (int)Mathf.Round(roNumber/2);
-            float x = (data[i][2]-97-h-3) * roWidth;
-            float y = (data[i][3]-97-h-3) * roHeight;
+            int h = (int)Mathf.Round(ro/2);
+            float x = (data[i][2]-97-h) * roWidth;
+            float y = (data[i][3]-97-h) * roHeight;
 
-            GameObject g = type=='B' ? blackPool.TryToSpawn() : whitePool.TryToSpawn();
-            Stone s = (Stone)g.transform.GetComponent(typeof(UdonBehaviour));
-
+            Stone s = (Stone)(type=='B'?blackPool:whitePool).TryToSpawn().transform.GetComponent(typeof(UdonBehaviour));
             string line = type+""+s.idx+","+x+","+0+","+y;
-            if ( log == "" ) log = line;
-            else log = line+'\n'+log;
+            log = log=="" ? line : line+'\n'+log;
         }
 
         if ( !kentoSwitch.isON ) kentoSwitch.Interact();
