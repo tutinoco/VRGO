@@ -20,7 +20,7 @@ public class GoSystem : UdonSharpBehaviour
     [Header("碁盤の基本情報を設定します")]    
     [SerializeField] private float roWidth;
     [SerializeField] private float roHeight;
-    [SerializeField] private int roNumber;    
+    [SerializeField] private int roNumber = 9;   
 
     [Header("SGFの入出力先となるInputFieldを設定します")]
     [SerializeField] private InputField sgfInputField;
@@ -28,6 +28,9 @@ public class GoSystem : UdonSharpBehaviour
 
     [Header("プレイ時間を表示するTextを設定します")]
     [SerializeField] private Text playTimeText;
+
+    [Header("コミを表示するTextを設定します")]
+    [SerializeField] private Text komiText;
 
     [Header("プレイヤー名を表示するTextを設定します")]
     [SerializeField] private Text blackUserText;
@@ -43,6 +46,7 @@ public class GoSystem : UdonSharpBehaviour
 
     [UdonSynced(UdonSyncMode.None), FieldChangeCallback(nameof(blackUser))] private string _blackUser;
     [UdonSynced(UdonSyncMode.None), FieldChangeCallback(nameof(whiteUser))] private string _whiteUser;
+    [UdonSynced(UdonSyncMode.None), FieldChangeCallback(nameof(komi))] private int _komi = 3;
     [UdonSynced(UdonSyncMode.None)] private double startTime;
 
     [System.NonSerialized] public bool isNormal;
@@ -107,6 +111,15 @@ public class GoSystem : UdonSharpBehaviour
         get { return _whiteUser; }
     }
 
+    public int komi {
+        set {
+            _komi = value;
+            String[] t = new String[]{"<size=14>置碁</size>","コミ<size=14>なし</size>","コミ<size=18>5.5</size>","コミ<size=18>6.5</size>","コミ<size=18>7.5</size>"};
+            komiText.text = t[value];
+        }
+        get { return _komi; }
+    }
+
     void Start()
     {
         blacks = new Stone[blackPool.Pool.Length];
@@ -166,16 +179,12 @@ public class GoSystem : UdonSharpBehaviour
     {
         RaycastHit hit;
 
-        if ( Networking.IsOwner(blackPool.gameObject) ) {
-            Vector3 p = blackPool.gameObject.transform.position;
-            Ray ray = new Ray(new Vector3(p.x, p.y+0.5f, p.z), new Vector3(0, -1, 0));
-            if ( Physics.Raycast(ray, out hit) && hit.collider!=null && hit.collider.gameObject.layer==24 ) blackPool.TryToSpawn();
-        }
-
-        if ( Networking.IsOwner(whitePool.gameObject) ) {
-            Vector3 p = whitePool.gameObject.transform.position;
-            Ray ray = new Ray(new Vector3(p.x, p.y+0.5f, p.z), new Vector3(0, -1, 0));
-            if ( Physics.Raycast(ray, out hit) && hit.collider!=null && hit.collider.gameObject.layer==24 ) whitePool.TryToSpawn();
+        foreach (VRCObjectPool pool in new VRCObjectPool[]{ blackPool, whitePool } ) {
+            if ( Networking.IsOwner(pool.gameObject) ) {
+                Vector3 p = pool.gameObject.transform.position;
+                Ray ray = new Ray(new Vector3(p.x, p.y+0.5f, p.z), new Vector3(0, -1, 0));
+                if ( Physics.Raycast(ray, out hit) && hit.collider!=null && hit.collider.gameObject.layer==24 ) pool.TryToSpawn();
+            }
         }
     }
 
@@ -300,24 +309,16 @@ public class GoSystem : UdonSharpBehaviour
             if( isMark && i==step+1 ) s.SendCustomNetworkEvent(NetworkEventTarget.All, "MarkerOn");
         }
 
-        for (int i=0; i<bptAry.Length; i++) {
-            Vector3 p1 = bptAry[i];
-            if ( p1 == null ) continue;
-            Stone s = blacks[i];
-            Vector3 p2 = s.transform.localPosition;
-            if ( Mathf.Abs(p1.x-p2.x) < roWidth*0.1 && Mathf.Abs(p1.z-p2.z) < roHeight*0.1 ) continue; // 位置が変わっていなければ無視
-            Networking.SetOwner(Networking.LocalPlayer, s.gameObject);
-            s.TeleportTo(p1);
-        }
-
-        for (int i=0; i<wptAry.Length; i++) {
-            Vector3 p1 = wptAry[i];
-            if ( p1 == null ) continue;
-            Stone s = whites[i];
-            Vector3 p2 = s.transform.localPosition;
-            if ( Mathf.Abs(p1.x-p2.x) < roWidth*0.1 && Mathf.Abs(p1.z-p2.z) < roHeight*0.1 ) continue; // 位置が変わっていなければ無視
-            Networking.SetOwner(Networking.LocalPlayer, s.gameObject);
-            s.TeleportTo(p1);
+        foreach (Vector3[] ptAry in new Vector3[][]{ bptAry, wptAry } ) {
+            for (int i=0; i<ptAry.Length; i++) {
+                Vector3 p1 = ptAry[i];
+                if ( p1 == null ) continue;
+                Stone s = ptAry==bptAry ? blacks[i] : whites[i];
+                Vector3 p2 = s.transform.localPosition;
+                if ( Mathf.Abs(p1.x-p2.x) < roWidth*0.1 && Mathf.Abs(p1.z-p2.z) < roHeight*0.1 ) continue; // 位置が変わっていなければ無視
+                Networking.SetOwner(Networking.LocalPlayer, s.gameObject);
+                s.TeleportTo(p1);
+            }
         }
 
         Networking.SetOwner(Networking.LocalPlayer, gameObject);
@@ -325,8 +326,9 @@ public class GoSystem : UdonSharpBehaviour
         RequestSerialization();
     }
 
-    private string getSgfValue(string sgf, string name, string def)
+    private string getSgfValue(string sgf, int line, string name, string def)
     {
+        sgf = sgf.Split(';')[line];
         int i = sgf.IndexOf(name);
         if ( i == -1 ) return def;
         i = sgf.IndexOf("[", i) + 1;
@@ -338,9 +340,9 @@ public class GoSystem : UdonSharpBehaviour
         Reset();
 
         string sgf = sgfInputField.text;
-        int ro = int.Parse(getSgfValue(sgf,"SZ","19"));
-        blackUser = getSgfValue(sgf,"PB","NO NAME");
-        whiteUser = getSgfValue(sgf,"PW","NO NAME");
+        int ro = int.Parse(getSgfValue(sgf,1,"SZ","19"));
+        blackUser = getSgfValue(sgf,1,"PB","NO NAME");
+        whiteUser = getSgfValue(sgf,1,"PW","NO NAME");
 
         int bcnt=-1;
         int wcnt=-1;
@@ -368,7 +370,8 @@ public class GoSystem : UdonSharpBehaviour
         DateTime dt = ToDatetime(startTime);
         string blackName = blackUser != "" ? blackUser : "NO NAME";
         string whiteName = whiteUser != "" ? whiteUser : "NO NAME";
-        string sgf = "(;AP[VRGO:1.0]SZ["+roNumber+"]PB["+blackName+"]PW["+whiteName+"]KM[6.5]DT["+dt.Year.ToString()+"-"+dt.Month.ToString()+"-"+dt.Day.ToString()+"]";
+        string k = (new String[]{"0","0","5.5","6.5","7.5"})[komi];
+        string sgf = "(;AP[VRGO:2.2]SZ["+roNumber+"]PB["+blackName+"]PW["+whiteName+"]KM["+k+"]DT["+dt.Year.ToString()+"-"+dt.Month.ToString()+"-"+dt.Day.ToString()+"]";
 
         bool prevIsBlack = false;
         for (int i=logSt.Length-1; i>=0; i--) {
@@ -385,5 +388,19 @@ public class GoSystem : UdonSharpBehaviour
         
         sgf += ")";
         sgfOutputField.text = sgf;
+    }
+    
+    public void KomiAdd()
+    {
+        if ( komi >= 4 ) return;
+        komi++;
+        RequestSerialization();
+    }
+
+    public void KomiSub()
+    {
+        if ( komi <= 0 ) return;
+        komi--;
+        RequestSerialization();
     }
 }
