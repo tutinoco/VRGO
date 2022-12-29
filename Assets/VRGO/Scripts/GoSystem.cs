@@ -20,7 +20,7 @@ public class GoSystem : UdonSharpBehaviour
     [Header("碁盤の基本情報を設定します")]    
     [SerializeField] private float roWidth;
     [SerializeField] private float roHeight;
-    [SerializeField] private int roNumber = 9;   
+    [SerializeField] private int roNumber;
 
     [Header("SGFの入出力先となるInputFieldを設定します")]
     [SerializeField] private InputField sgfInputField;
@@ -72,6 +72,9 @@ public class GoSystem : UdonSharpBehaviour
 
     public void KentoOn() { if ( logSt.Length > 0 ) { isKento = true; ReadLog(pcnt=-1); } }
     public void KentoOff() { isKento = false; ReadLog(pcnt=-1); }
+
+    public void SpawnBlack() { if ( Networking.IsOwner(blackPool.gameObject) ) blackPool.TryToSpawn(); }
+    public void SpawnWhite() { if ( Networking.IsOwner(whitePool.gameObject) ) whitePool.TryToSpawn(); }
 
     public string log {
         set {
@@ -182,7 +185,7 @@ public class GoSystem : UdonSharpBehaviour
         foreach (VRCObjectPool pool in new VRCObjectPool[]{ blackPool, whitePool } ) {
             if ( Networking.IsOwner(pool.gameObject) ) {
                 Vector3 p = pool.gameObject.transform.position;
-                Ray ray = new Ray(new Vector3(p.x, p.y+0.5f, p.z), new Vector3(0, -1, 0));
+                Ray ray = new Ray(new Vector3(p.x, p.y+0.03f, p.z), new Vector3(0, -1, 0));
                 if ( Physics.Raycast(ray, out hit) && hit.collider!=null && hit.collider.gameObject.layer==24 ) pool.TryToSpawn();
             }
         }
