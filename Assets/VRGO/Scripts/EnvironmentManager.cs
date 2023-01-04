@@ -10,6 +10,12 @@ public class EnvironmentManager : UdonSharpBehaviour
     [SerializeField] private GameObject goSystemsGobj;
     [SerializeField] private GameObject screensGobj;
 
+    [Header("Masterの足元に配置されるGameObjectを設定します")]
+    [SerializeField] private GameObject masterPlane;
+
+    [Header("EnvironmentPaneのGameObjectを設定します")]
+    [SerializeField] private GameObject environmentPane;
+
     private GoSystem[] goSystems;
     private GameObject[] playAreas;
     private GameObject[] screens;
@@ -51,6 +57,17 @@ public class EnvironmentManager : UdonSharpBehaviour
         if ( !Networking.IsOwner(gameObject) ) return;
         goValue = 1;
         RequestSerialization();
+    }
+
+    private void Update()
+    {
+        environmentPane.SetActive(Networking.IsMaster);
+
+        if (Networking.IsMaster)
+        {
+            Vector3 p = Networking.LocalPlayer.GetPosition();
+            masterPlane.transform.position = new Vector3(p.x, 0.001f, p.z);
+        }
     }
 
     public void AddGo()
