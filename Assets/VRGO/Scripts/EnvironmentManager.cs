@@ -1,5 +1,6 @@
 ﻿using UdonSharp;
 using UnityEngine;
+using UnityEngine.UI;
 using VRC.SDKBase;
 using VRC.Udon;
 
@@ -41,6 +42,14 @@ public class EnvironmentManager : UdonSharpBehaviour
         for (int i=0; i<len1; i++) {
             goSystems[i] = (GoSystem)goSystemsGobj.transform.GetChild(i).GetComponent(typeof(UdonBehaviour));
             playAreas[i] = goSystems[i].transform.Find("PlayArea").gameObject;
+
+            for (int j=0; j<2; j++) {
+                GameObject alphabet = playAreas[i].transform.Find("ScreenTarget").transform.Find("TableChar").gameObject; 
+                Text t = alphabet.transform.GetChild(j).GetComponent<Text>();
+
+                string tablechar = "いろはにほへとちりぬるをわかよたれそつねならむうゐのおくやまけふこえてあさきゆめみしゑひもせすん";
+                t.text = tablechar[Mathf.Abs(len1-1-i*2+(len1/2<i?1:0))]+"";
+            }
         }
 
         int len2 = screensGobj.transform.childCount;

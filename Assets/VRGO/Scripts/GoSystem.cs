@@ -36,7 +36,8 @@ public class GoSystem : UdonSharpBehaviour
     [SerializeField] private Text blackUserText;
     [SerializeField] private Text whiteUserText;
 
-    [Header("連動して動作するスイッチを登録します")]
+    [Header("システムが利用するスイッチを登録します")]
+    [SerializeField] private BenriSwitch GoSystemPaneSwitch;
     [SerializeField] private BenriSwitch kentoSwitch;
 
     [UdonSynced(UdonSyncMode.None), FieldChangeCallback(nameof(log))] private string _log = "";
@@ -239,6 +240,8 @@ public class GoSystem : UdonSharpBehaviour
         logSt = new Stone[0];
         logPt = new Vector3[0];
 
+        if( !GoSystemPaneSwitch.isON ) GoSystemPaneSwitch.Interact();
+
         if ( Networking.IsOwner(blackPool.gameObject) ) foreach (Stone s in blacks) if( s.gameObject.activeSelf ) blackPool.Return( s.gameObject );
         if ( Networking.IsOwner(whitePool.gameObject) ) foreach (Stone s in whites) if( s.gameObject.activeSelf ) whitePool.Return( s.gameObject );
     }
@@ -259,6 +262,20 @@ public class GoSystem : UdonSharpBehaviour
         Text t = isBlack ? blackUserText : whiteUserText;
         String s = (isBlack?"黒":"白");
         t.text = name=="" ? s : s+": "+name;
+    }
+
+    public void GoSystemPaneOpen()
+    {
+        string localPlayerName = Networking.LocalPlayer.displayName;
+        if( blackUser != "" && whiteUser != "" && !Networking.LocalPlayer.isMaster && !(localPlayerName==blackUser || localPlayerName==whiteUser) ) return;
+        if( !GoSystemPaneSwitch.isON ) GoSystemPaneSwitch.Interact();
+    }
+
+    public void GoSystemPaneClose()
+    {
+        string localPlayerName = Networking.LocalPlayer.displayName;
+        if( blackUser != "" && whiteUser != "" && !Networking.LocalPlayer.isMaster && !(localPlayerName==blackUser || localPlayerName==whiteUser) ) return;
+        if( GoSystemPaneSwitch.isON ) GoSystemPaneSwitch.Interact();
     }
 
     public void WriteLog( Stone s )
@@ -347,8 +364,6 @@ public class GoSystem : UdonSharpBehaviour
         blackUser = getSgfValue(sgf,1,"PB","NO NAME");
         whiteUser = getSgfValue(sgf,1,"PW","NO NAME");
 
-        int bcnt=-1;
-        int wcnt=-1;
         string[] data = sgf.Split(';');
 
         if ( data.Length < 2 ) { sgfInputField.text = "ERROR!"; return; }

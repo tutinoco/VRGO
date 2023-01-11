@@ -8,7 +8,7 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: panel_gosys
-  m_Shader: {fileID: 4800000, guid: affc81f3d164d734d8f13053effb1c5c, type: 3}
+  m_Shader: {fileID: 46, guid: 0000000000000000f000000000000000, type: 0}
   m_ShaderKeywords: 
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
@@ -41,8 +41,8 @@ Material:
         m_Offset: {x: 0.5, y: 0.475}
     - _MainTex:
         m_Texture: {fileID: 2800000, guid: ec01baae10a0e3743b46b8b7ede2b6e5, type: 3}
-        m_Scale: {x: 0.965, y: 1.98}
-        m_Offset: {x: 0.5, y: 0.475}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _MetallicGlossMap:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
