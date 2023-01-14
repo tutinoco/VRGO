@@ -18,9 +18,10 @@ public class GoSystem : UdonSharpBehaviour
     private Stone[] whites;
 
     [Header("碁盤の基本情報を設定します")]    
+    [SerializeField] private int roNumber;
     [SerializeField] private float roWidth;
     [SerializeField] private float roHeight;
-    [SerializeField] private int roNumber;
+    [SerializeField] private float boardHeight;
 
     [Header("SGFの入出力先となるInputFieldを設定します")]
     [SerializeField] private InputField sgfInputField;
@@ -39,6 +40,10 @@ public class GoSystem : UdonSharpBehaviour
     [Header("システムが利用するスイッチを登録します")]
     [SerializeField] private BenriSwitch GoSystemPaneSwitch;
     [SerializeField] private BenriSwitch kentoSwitch;
+
+    [Header("碁石の位置をわかりやすくするガイドのGameObjectを登録します")]
+    [SerializeField] private GameObject Guide;
+    private Stone GuideTargetStone;
 
     [UdonSynced(UdonSyncMode.None), FieldChangeCallback(nameof(log))] private string _log = "";
     [UdonSynced(UdonSyncMode.None)] private int pcnt;
@@ -146,6 +151,15 @@ public class GoSystem : UdonSharpBehaviour
         SendCustomEventDelayedSeconds(nameof(UpdateOneSeconds), 1.0f);
     }
 
+    void Update()
+    {
+        if( GuideTargetStone != null ) {
+            RaycastHit hit;
+            Ray ray = new Ray(GuideTargetStone.transform.position, new Vector3(0, -1, 0));
+            if ( Physics.Raycast(ray, out hit) && hit.collider!=null ) Guide.transform.position = hit.point;
+        }
+    }
+
     public void UpdateOneSeconds()
     {
         TryToSpawn();
@@ -181,13 +195,13 @@ public class GoSystem : UdonSharpBehaviour
 
     private void TryToSpawn()
     {
-        RaycastHit hit;
-
         foreach (VRCObjectPool pool in new VRCObjectPool[]{ blackPool, whitePool } ) {
             if ( Networking.IsOwner(pool.gameObject) ) {
                 Vector3 p = pool.gameObject.transform.position;
+                RaycastHit hit;
                 Ray ray = new Ray(new Vector3(p.x, p.y+0.03f, p.z), new Vector3(0, -1, 0));
-                if ( Physics.Raycast(ray, out hit) && hit.collider!=null && hit.collider.gameObject.layer==24 ) pool.TryToSpawn();
+                int mask = 1 << 22 | 1 << 24;
+                if ( Physics.Raycast(ray, out hit, mask) && hit.collider!=null && hit.collider.gameObject.layer==24 ) pool.TryToSpawn();
             }
         }
     }
@@ -249,6 +263,14 @@ public class GoSystem : UdonSharpBehaviour
     public Vector2Int GetZahyo( Vector3 pos )
     {
         return new Vector2Int((int)Mathf.Round(pos.x/roWidth),(int)Mathf.Round(pos.z/roHeight));
+    }
+
+    public void PutOnBoard( Stone s )
+    {
+        Vector3 p = s.transform.position;
+        Vector3 a = s.transform.eulerAngles;
+        s.transform.position = new Vector3(p.x, boardHeight, p.z);
+        s.transform.rotation = Quaternion.Euler(-90, a.y, 0);
     }
 
     public Vector3 GetNormalPosition( Vector3 pos )
@@ -420,5 +442,10 @@ public class GoSystem : UdonSharpBehaviour
         if ( komi <= 0 ) return;
         komi--;
         RequestSerialization();
+    }
+
+    public void SetGuideTargetStone( Stone s )
+    {
+        GuideTargetStone = s;        
     }
 }

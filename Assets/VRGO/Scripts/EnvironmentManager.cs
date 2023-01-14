@@ -60,7 +60,7 @@ public class EnvironmentManager : UdonSharpBehaviour
             screen.transform.SetParent(goSystems[i].gameObject.transform);
             screen.transform.Find("Camera").SetParent(playAreas[i].transform);
             goSystems[i].gameObject.transform.Find("PlayerNames").SetParent(screens[i].transform);
-            goSystems[i].gameObject.transform.Find("PlayTime").SetParent(screens[i].transform);
+            goSystems[i].gameObject.transform.Find("Time").SetParent(screens[i].transform);
         }
 
         if ( !Networking.IsOwner(gameObject) ) return;

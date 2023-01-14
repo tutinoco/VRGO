@@ -88,6 +88,7 @@ public class Stone : UdonSharpBehaviour
         if ( state == StoneState.Spawned ) SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PlayPickupSound));
         if ( state == StoneState.Sended ) SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PlayTakeSound));
         state = StoneState.Pickup;
+        gosys.SetGuideTargetStone(this);
     }
 
     void OnCollisionStay(Collision col)
@@ -98,6 +99,7 @@ public class Stone : UdonSharpBehaviour
         if ( col.gameObject.layer==23 ) {
             if ( state==StoneState.Droped ) {
                 SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PlayStrikeSound));
+                gosys.PutOnBoard(this);
                 state = StoneState.Hited;
             }
         }
