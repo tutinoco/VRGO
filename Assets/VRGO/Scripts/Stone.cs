@@ -29,9 +29,6 @@ public class Stone : UdonSharpBehaviour
     [Header("VRCObjectSyncを設定します")]
     [SerializeField] private VRCObjectSync objectsync;
 
-    [Header("マーカーを設定します")]
-    [SerializeField] private GameObject marker;
-
     [Header("効果音を設定します")]
     [SerializeField] private AudioSource audioSource;
     [SerializeField] private AudioClip sndPickup;
@@ -105,7 +102,6 @@ public class Stone : UdonSharpBehaviour
         }
 
         if ( col.gameObject.layer==24 ) {
-            MarkerOff();
             if( state==StoneState.Droped ) {
                 gosys.Return(this);
                 SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PlayReturnSound));
@@ -120,6 +116,6 @@ public class Stone : UdonSharpBehaviour
     public void PlayPickupSound() { if(audioSource && sndPickup) audioSource.PlayOneShot(sndPickup); }
     public void PlayReturnSound() { if(audioSource && sndReturn) audioSource.PlayOneShot(sndReturn); }
 
-    public void MarkerOn() { gosys.AllMarkerOff(); marker.gameObject.SetActive(true); }
-    public void MarkerOff() { marker.gameObject.SetActive(false); }
+    public void MarkerOn() { }
+    public void MarkerOff() { }
 }

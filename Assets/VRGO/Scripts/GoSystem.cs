@@ -41,12 +41,15 @@ public class GoSystem : UdonSharpBehaviour
     [SerializeField] private BenriSwitch GoSystemPaneSwitch;
     [SerializeField] private BenriSwitch kentoSwitch;
 
+    [Header("最終手を知らせるマーカーのGameObjectを登録します")]
+    [SerializeField] private GameObject Mark;
+
     [Header("碁石の位置をわかりやすくするガイドのGameObjectを登録します")]
     [SerializeField] private GameObject Guide;
     private Stone GuideTargetStone;
 
     [UdonSynced(UdonSyncMode.None), FieldChangeCallback(nameof(log))] private string _log = "";
-    [UdonSynced(UdonSyncMode.None)] private int pcnt;
+    [UdonSynced(UdonSyncMode.None)] private int pcnt = -1;
     private Stone[] logSt = new Stone[0];
     private Vector3[] logPt = new Vector3[0];
 
@@ -56,7 +59,6 @@ public class GoSystem : UdonSharpBehaviour
     [UdonSynced(UdonSyncMode.None)] private double startTime;
 
     [System.NonSerialized] public bool isNormal;
-    [System.NonSerialized] public bool isMark;
     [System.NonSerialized] public bool isKento;
 
     public void Resync() { ReadLog(pcnt); }
@@ -72,9 +74,6 @@ public class GoSystem : UdonSharpBehaviour
 
     public void NormalOn() { isNormal = true; }
     public void NormalOff() { isNormal = false; }
-
-    public void MarkOn() { isMark = true; UpdateMark(); }
-    public void MarkOff() { isMark = false; AllMarkerOff(); }
 
     public void KentoOn() { if ( logSt.Length > 0 ) { isKento = true; ReadLog(pcnt=-1); } }
     public void KentoOff() { isKento = false; ReadLog(pcnt=-1); }
@@ -103,9 +102,6 @@ public class GoSystem : UdonSharpBehaviour
                     max++;
                 }
             }
-
-            // ログが更新されたら最終手にマーカーをつける
-            if(isMark) UpdateMark();
         }
         get { return _log; }
     }
@@ -155,8 +151,16 @@ public class GoSystem : UdonSharpBehaviour
     {
         if( GuideTargetStone != null ) {
             RaycastHit hit;
+            int mask = 1 << 23 | 1 << 24;
             Ray ray = new Ray(GuideTargetStone.transform.position, new Vector3(0, -1, 0));
-            if ( Physics.Raycast(ray, out hit) && hit.collider!=null ) Guide.transform.position = hit.point;
+            if ( Physics.Raycast(ray, out hit, mask) && hit.collider!=null ) Guide.transform.position = hit.point;
+        }
+
+        Mark.gameObject.SetActive(false);
+        if ( logSt.Length > 0 && pcnt+1 < logSt.Length ) {
+            Mark.gameObject.SetActive(true);
+            Vector3 p = logSt[pcnt+1].transform.position;
+            Mark.transform.position = new Vector3(p.x, Mark.transform.position.y, p.z);
         }
     }
 
@@ -231,23 +235,10 @@ public class GoSystem : UdonSharpBehaviour
         SendCustomNetworkEvent(NetworkEventTarget.All, nameof(Initialize));
     }
 
-    private void UpdateMark()
-    {
-        if ( logSt.Length == 0 ) return;
-        AllMarkerOff();
-        logSt[0].MarkerOn();
-    }
-
-    public void AllMarkerOff()
-    {
-        foreach (Stone s in blacks) if( s.gameObject.activeSelf ) s.MarkerOff();
-        foreach (Stone s in whites) if( s.gameObject.activeSelf ) s.MarkerOff();
-    }
-
     public void Initialize()
     {
         log = "";
-        pcnt = 0;
+        pcnt = -1;
         blackUser = "";
         whiteUser = "";
         startTime = 0;
@@ -337,8 +328,6 @@ public class GoSystem : UdonSharpBehaviour
         Vector3[] bptAry = new Vector3[blacks.Length];
         Vector3[] wptAry = new Vector3[whites.Length];
 
-        if( isMark ) SendCustomNetworkEvent(NetworkEventTarget.All, "AllMarkerOff");
-
         Vector3 blackSpawnPoint = GetSpawnPoint(true);
         Vector3 whiteSpawnPoint = GetSpawnPoint(false);
         for (int i=0; i<blacks.Length; i++) if ( blacks[i].gameObject.activeSelf ) bptAry[i] = blackSpawnPoint;
@@ -348,7 +337,6 @@ public class GoSystem : UdonSharpBehaviour
             Stone s = logSt[i];
             Vector3 p = logPt[i];
             if( s.isBlack ) bptAry[s.idx] = p; else wptAry[s.idx] = p;
-            if( isMark && i==step+1 ) s.SendCustomNetworkEvent(NetworkEventTarget.All, "MarkerOn");
         }
 
         foreach (Vector3[] ptAry in new Vector3[][]{ bptAry, wptAry } ) {
