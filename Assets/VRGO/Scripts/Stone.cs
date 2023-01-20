@@ -49,8 +49,11 @@ public class Stone : UdonSharpBehaviour
             if( gosys.isNormal ) {
                 Vector2Int zahyo = gosys.GetZahyo(gameObject.transform.localPosition);
                 if( Mathf.Abs(zahyo.x) <= 9 && Mathf.Abs(zahyo.y) <= 9 ) {
-                    TeleportTo(gosys.GetNormalPosition(gameObject.transform.localPosition));
-                    SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PlayNormalSound));
+                    Vector3 pos = gosys.GetNormalPosition(gameObject.transform.localPosition);
+                    if( gameObject.transform.localPosition != pos ) {
+                        TeleportTo(pos);
+                        SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PlayNormalSound));
+                    }
                 }
             }
             SendCustomNetworkEvent(NetworkEventTarget.All, nameof(OnSleepInOwner));

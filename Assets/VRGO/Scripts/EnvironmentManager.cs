@@ -64,7 +64,7 @@ public class EnvironmentManager : UdonSharpBehaviour
         }
 
         if ( !Networking.IsOwner(gameObject) ) return;
-        goValue = 1;
+        goValue = 3;
         RequestSerialization();
     }
 

@@ -224,6 +224,12 @@ public class GoSystem : UdonSharpBehaviour
 
     public void Reset()
     {
+        // 検討モードをOFFにします。
+        if ( kentoSwitch.isON ) {
+            kentoSwitch.SyncOFF_event();
+            kentoSwitch.SyncOFF_silent();
+        }
+
         // 全ての権限を移譲する
         Networking.SetOwner(Networking.LocalPlayer, gameObject);
         Networking.SetOwner(Networking.LocalPlayer, blackPool.gameObject);
@@ -267,6 +273,20 @@ public class GoSystem : UdonSharpBehaviour
     public Vector3 GetNormalPosition( Vector3 pos )
     {
         Vector2Int zahyo = GetZahyo(pos);
+        foreach (Stone s in blacks) {
+            if( !s.gameObject.activeSelf ) continue;
+            Vector3 pos2 = s.transform.localPosition;
+            if( pos == pos2 ) continue;
+            Vector2Int zahyo2 = GetZahyo(pos2);
+            if( zahyo.x == zahyo2.x && zahyo.y == zahyo2.y ) return pos;
+        }
+        foreach (Stone s in whites) {
+            if( !s.gameObject.activeSelf ) continue;
+            Vector3 pos2 = s.transform.localPosition;
+            if( pos == pos2 ) continue;
+            Vector2Int zahyo2 = GetZahyo(pos2);
+            if( zahyo.x == zahyo2.x && zahyo.y == zahyo2.y ) return pos;
+        }
         return new Vector3((float)zahyo.x*roWidth, pos.y, (float)zahyo.y*roHeight);
     }
 
