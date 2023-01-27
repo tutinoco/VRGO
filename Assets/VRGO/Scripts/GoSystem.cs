@@ -44,6 +44,9 @@ public class GoSystem : UdonSharpBehaviour
     [Header("最終手を知らせるマーカーのGameObjectを登録します")]
     [SerializeField] private GameObject Mark;
 
+    [Header("碁石に触られないようにするガードのGameObjectを登録します")]
+    [SerializeField] private GameObject Guard;
+
     [Header("碁石の位置をわかりやすくするガイドのGameObjectを登録します")]
     [SerializeField] private GameObject Guide;
     private Stone GuideTargetStone;
@@ -61,7 +64,7 @@ public class GoSystem : UdonSharpBehaviour
     [System.NonSerialized] public bool isNormal;
     [System.NonSerialized] public bool isKento;
 
-    public void Resync() { ReadLog(pcnt); }
+    public void SetGuideTargetStone( Stone s ) { GuideTargetStone = s; }
 
     public void PrevLog() { if( pcnt < logSt.Length-1 ) ReadLog(pcnt+1); }
     public void NextLog() { if( pcnt >= 0 ) ReadLog(pcnt-1); }
@@ -80,6 +83,15 @@ public class GoSystem : UdonSharpBehaviour
 
     public void SpawnBlack() { if ( Networking.IsOwner(blackPool.gameObject) ) blackPool.TryToSpawn(); }
     public void SpawnWhite() { if ( Networking.IsOwner(whitePool.gameObject) ) whitePool.TryToSpawn(); }
+
+    public void GoSystemPaneOpen() { GoSystemPane(true); }
+    public void GoSystemPaneClose() { GoSystemPane(false); }
+
+    public void KomiAdd() { if ( !(komi >= 4) ) { komi++; RequestSerialization(); } }
+    public void KomiSub() { if ( !(komi <= 0) ) { komi--; RequestSerialization(); } }
+
+    public void GuardOn() { Guard.SetActive(true); string n=Networking.LocalPlayer.displayName; bool b=(Networking.LocalPlayer.isMaster||n==blackUser||n==whiteUser); Guard.GetComponent<Collider>().enabled=!b; }
+    public void GuardOff() { Guard.SetActive(false); }
 
     public string log {
         set {
@@ -151,10 +163,12 @@ public class GoSystem : UdonSharpBehaviour
     {
         if( GuideTargetStone != null ) {
             RaycastHit hit;
-            int mask = 1 << 23 | 1 << 24;
+            int mask = ~(1 << 22 | 1 << 26);
             Ray ray = new Ray(GuideTargetStone.transform.position, new Vector3(0, -1, 0));
-            if ( Physics.Raycast(ray, out hit, mask) && hit.collider!=null ) Guide.transform.position = hit.point;
+            if ( Physics.Raycast(ray, out hit, float.MaxValue, mask) && hit.collider!=null ) Guide.transform.position = hit.point;
         }
+
+        Guard.transform.Rotate(0, 0, 2);
 
         Mark.gameObject.SetActive(false);
         if ( logSt.Length > 0 && pcnt+1 < logSt.Length ) {
@@ -205,7 +219,7 @@ public class GoSystem : UdonSharpBehaviour
                 RaycastHit hit;
                 Ray ray = new Ray(new Vector3(p.x, p.y+0.03f, p.z), new Vector3(0, -1, 0));
                 int mask = 1 << 22 | 1 << 24;
-                if ( Physics.Raycast(ray, out hit, mask) && hit.collider!=null && hit.collider.gameObject.layer==24 ) pool.TryToSpawn();
+                if ( Physics.Raycast(ray, out hit, float.MaxValue, mask) && hit.collider!=null && hit.collider.gameObject.layer==24 ) pool.TryToSpawn();
             }
         }
     }
@@ -225,10 +239,7 @@ public class GoSystem : UdonSharpBehaviour
     public void Reset()
     {
         // 検討モードをOFFにします。
-        if ( kentoSwitch.isON ) {
-            kentoSwitch.SyncOFF_event();
-            kentoSwitch.SyncOFF_silent();
-        }
+        if ( kentoSwitch.isON ) kentoSwitch.Switch();
 
         // 全ての権限を移譲する
         Networking.SetOwner(Networking.LocalPlayer, gameObject);
@@ -251,7 +262,7 @@ public class GoSystem : UdonSharpBehaviour
         logSt = new Stone[0];
         logPt = new Vector3[0];
 
-        if( !GoSystemPaneSwitch.isON ) GoSystemPaneSwitch.Interact();
+        if( !GoSystemPaneSwitch.isON ) GoSystemPaneSwitch.Switch();
 
         if ( Networking.IsOwner(blackPool.gameObject) ) foreach (Stone s in blacks) if( s.gameObject.activeSelf ) blackPool.Return( s.gameObject );
         if ( Networking.IsOwner(whitePool.gameObject) ) foreach (Stone s in whites) if( s.gameObject.activeSelf ) whitePool.Return( s.gameObject );
@@ -273,19 +284,14 @@ public class GoSystem : UdonSharpBehaviour
     public Vector3 GetNormalPosition( Vector3 pos )
     {
         Vector2Int zahyo = GetZahyo(pos);
-        foreach (Stone s in blacks) {
-            if( !s.gameObject.activeSelf ) continue;
-            Vector3 pos2 = s.transform.localPosition;
-            if( pos == pos2 ) continue;
-            Vector2Int zahyo2 = GetZahyo(pos2);
-            if( zahyo.x == zahyo2.x && zahyo.y == zahyo2.y ) return pos;
-        }
-        foreach (Stone s in whites) {
-            if( !s.gameObject.activeSelf ) continue;
-            Vector3 pos2 = s.transform.localPosition;
-            if( pos == pos2 ) continue;
-            Vector2Int zahyo2 = GetZahyo(pos2);
-            if( zahyo.x == zahyo2.x && zahyo.y == zahyo2.y ) return pos;
+        foreach (Stone[] stones in new Stone[][]{ blacks, whites } ) {
+            foreach (Stone s in stones) {
+                if( !s.gameObject.activeSelf ) continue;
+                Vector3 pos2 = s.transform.localPosition;
+                if( pos == pos2 ) continue;
+                Vector2Int zahyo2 = GetZahyo(pos2);
+                if( zahyo.x == zahyo2.x && zahyo.y == zahyo2.y ) return pos;
+            }
         }
         return new Vector3((float)zahyo.x*roWidth, pos.y, (float)zahyo.y*roHeight);
     }
@@ -297,18 +303,13 @@ public class GoSystem : UdonSharpBehaviour
         t.text = name=="" ? s : s+": "+name;
     }
 
-    public void GoSystemPaneOpen()
+    public void GoSystemPane( bool open )
     {
         string localPlayerName = Networking.LocalPlayer.displayName;
-        if( blackUser != "" && whiteUser != "" && !Networking.LocalPlayer.isMaster && !(localPlayerName==blackUser || localPlayerName==whiteUser) ) return;
-        if( !GoSystemPaneSwitch.isON ) GoSystemPaneSwitch.Interact();
-    }
-
-    public void GoSystemPaneClose()
-    {
-        string localPlayerName = Networking.LocalPlayer.displayName;
-        if( blackUser != "" && whiteUser != "" && !Networking.LocalPlayer.isMaster && !(localPlayerName==blackUser || localPlayerName==whiteUser) ) return;
-        if( GoSystemPaneSwitch.isON ) GoSystemPaneSwitch.Interact();
+        if( !(blackUser != "" && whiteUser != "" && !Networking.LocalPlayer.isMaster && !(localPlayerName==blackUser || localPlayerName==whiteUser)) ) {
+            if( open != GoSystemPaneSwitch.isON ) GoSystemPaneSwitch.Switch();
+        }
+        GoSystemPaneSwitch.UpdateLinks();
     }
 
     public void WriteLog( Stone s )
@@ -409,7 +410,7 @@ public class GoSystem : UdonSharpBehaviour
             log = log=="" ? line : line+'\n'+log;
         }
 
-        if ( !kentoSwitch.isON ) kentoSwitch.Interact();
+        if ( !kentoSwitch.isON ) kentoSwitch.Switch();
         else ReadLog(pcnt=-1);
     }
 
@@ -436,24 +437,5 @@ public class GoSystem : UdonSharpBehaviour
         
         sgf += ")";
         sgfOutputField.text = sgf;
-    }
-    
-    public void KomiAdd()
-    {
-        if ( komi >= 4 ) return;
-        komi++;
-        RequestSerialization();
-    }
-
-    public void KomiSub()
-    {
-        if ( komi <= 0 ) return;
-        komi--;
-        RequestSerialization();
-    }
-
-    public void SetGuideTargetStone( Stone s )
-    {
-        GuideTargetStone = s;        
     }
 }
