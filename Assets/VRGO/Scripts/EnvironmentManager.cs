@@ -72,10 +72,24 @@ public class EnvironmentManager : UdonSharpBehaviour
     {
         environmentPane.SetActive(Networking.IsMaster);
 
-        if (Networking.IsMaster)
-        {
-            Vector3 p = Networking.LocalPlayer.GetPosition();
+        var player = Networking.LocalPlayer;
+        if (Networking.IsMaster) {
+            Vector3 p = player.GetPosition();
             masterPlane.transform.position = new Vector3(p.x, 0.001f, p.z);
+        }
+
+        // 掴みながらShift押すとゆっくり移動するように変更
+        var rightHand = player.GetPickupInHand(VRC_Pickup.PickupHand.Right);
+        var leftHand = player.GetPickupInHand(VRC_Pickup.PickupHand.Left);
+        bool isPickup = rightHand != null || leftHand != null;
+        if ( isPickup && Input.GetKey(KeyCode.LeftShift) ) {
+            player.SetRunSpeed(0.5f);
+            player.SetWalkSpeed(0.5f);
+            player.SetStrafeSpeed(0.5f);
+        } else {
+            player.SetRunSpeed(4.0f);
+            player.SetWalkSpeed(2.0f);
+            player.SetStrafeSpeed(2.0f);
         }
     }
 

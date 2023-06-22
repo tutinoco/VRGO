@@ -81,8 +81,6 @@ public class Stone : UdonSharpBehaviour
     void OnDrop()
     {
         state = StoneState.Droped;
-        Networking.LocalPlayer.SetWalkSpeed(2.0f);
-        Networking.LocalPlayer.SetStrafeSpeed(2.0f);
     }
 
     void OnPickup()
@@ -91,8 +89,6 @@ public class Stone : UdonSharpBehaviour
         if ( state == StoneState.Sended ) SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PlayTakeSound));
         state = StoneState.Pickup;
         gosys.SetGuideTargetStone(this);
-        Networking.LocalPlayer.SetWalkSpeed(0.5f);
-        Networking.LocalPlayer.SetStrafeSpeed(0.5f);
     }
 
     void OnCollisionStay(Collision col)
