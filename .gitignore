@@ -1,5 +1,4 @@
 .DS_Store
-*.meta
 Backup~
 
 Library/
@@ -29,4 +28,5 @@ VRC.Udon.Editor.csproj
 VRC.Udon.Serialization.OdinSerializer.csproj
 VRC.Udon.csproj
 VRGO.sln
+VRGO_antei.sln
 com.vrchat.core.vpm-resolver.Editor.csproj
